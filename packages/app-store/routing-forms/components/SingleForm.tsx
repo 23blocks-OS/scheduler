@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc/react";
 import classNames from "@calcom/ui/classNames";
@@ -238,8 +237,6 @@ export default function SingleFormWrapper({ form: _form, ...props }: SingleFormC
     throw new Error(t("something_went_wrong"));
   }
   return (
-    <LicenseRequired>
-      <SingleForm form={form} {...props} />
-    </LicenseRequired>
+    <SingleForm form={form} {...props} />
   );
 }

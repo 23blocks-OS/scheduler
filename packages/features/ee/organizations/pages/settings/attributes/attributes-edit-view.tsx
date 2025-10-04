@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { useFormContext } from "react-hook-form";
 import { z } from "zod";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc/react";
 import { Button } from "@calcom/ui/components/button";
@@ -47,30 +46,28 @@ function CreateAttributesPage() {
 
   return (
     <>
-      <LicenseRequired>
-        {!attribute.isLoading && attribute.data ? (
-          <AttributeForm
-            initialValues={{
-              attrName: attribute.data.name,
-              type: attribute.data.type,
-              options: attribute.data.options,
-              isLocked: attribute.data.isLocked,
-              isWeightsEnabled: attribute.data.isWeightsEnabled,
-            }}
-            header={<EditAttributeHeader isPending={mutation.isPending} />}
-            onSubmit={(values) => {
-              const { attrName, ...rest } = values;
-              mutation.mutate({
-                ...rest,
-                name: attrName,
-                attributeId: id,
-              });
-            }}
-          />
-        ) : (
-          <>Loading</>
-        )}
-      </LicenseRequired>
+      {!attribute.isLoading && attribute.data ? (
+        <AttributeForm
+          initialValues={{
+            attrName: attribute.data.name,
+            type: attribute.data.type,
+            options: attribute.data.options,
+            isLocked: attribute.data.isLocked,
+            isWeightsEnabled: attribute.data.isWeightsEnabled,
+          }}
+          header={<EditAttributeHeader isPending={mutation.isPending} />}
+          onSubmit={(values) => {
+            const { attrName, ...rest } = values;
+            mutation.mutate({
+              ...rest,
+              name: attrName,
+              attributeId: id,
+            });
+          }}
+        />
+      ) : (
+        <>Loading</>
+      )}
     </>
   );
 }

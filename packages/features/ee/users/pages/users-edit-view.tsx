@@ -9,7 +9,6 @@ import { getParserWithGeneric } from "@calcom/prisma/zod-utils";
 import { trpc } from "@calcom/trpc/react";
 import { showToast } from "@calcom/ui/components/toast";
 
-import LicenseRequired from "../../common/components/LicenseRequired";
 import { UserForm } from "../components/UserForm";
 import { userBodySchema } from "../schemas/userBodySchema";
 import type { UserAdminRouterOutputs } from "../server/trpc-router";
@@ -27,11 +26,9 @@ const UsersEditPage = () => {
   const { user } = data;
 
   return (
-    <LicenseRequired>
-      <NoSSR>
-        <UsersEditView user={user} />
-      </NoSSR>
-    </LicenseRequired>
+    <NoSSR>
+      <UsersEditView user={user} />
+    </NoSSR>
   );
 };
 

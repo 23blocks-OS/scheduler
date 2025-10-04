@@ -7,7 +7,6 @@ import { Controller, useForm } from "react-hook-form";
 
 import { checkAdminOrOwner } from "@calcom/features/auth/lib/checkAdminOrOwner";
 import { TimezoneSelect } from "@calcom/features/components/timezone-select";
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import SectionBottomActions from "@calcom/features/settings/SectionBottomActions";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { nameOfDay } from "@calcom/lib/weekday";
@@ -74,7 +73,7 @@ const OrgGeneralView = () => {
   }
 
   return (
-    <LicenseRequired>
+    <>
       <GeneralView
         currentOrg={currentOrg}
         isAdminOrOwner={isAdminOrOwner}
@@ -84,7 +83,7 @@ const OrgGeneralView = () => {
       <LockEventTypeSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
       <NoSlotsNotificationSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
       <DisablePhoneOnlySMSNotificationsSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
-    </LicenseRequired>
+    </>
   );
 };
 

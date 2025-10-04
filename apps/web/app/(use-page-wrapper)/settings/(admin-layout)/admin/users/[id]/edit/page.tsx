@@ -2,7 +2,6 @@ import { type Params } from "app/_types";
 import { _generateMetadata, getTranslate } from "app/_utils";
 import { z } from "zod";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { UsersEditView } from "@calcom/features/ee/users/pages/users-edit-view";
 import SettingsHeader from "@calcom/features/settings/appDir/SettingsHeader";
 import { UserRepository } from "@calcom/lib/server/repository/user";
@@ -42,9 +41,7 @@ const Page = async ({ params }: { params: Params }) => {
 
   return (
     <SettingsHeader title={t("editing_user")} description={t("admin_users_edit_description")}>
-      <LicenseRequired>
-        <UsersEditView user={user} />
-      </LicenseRequired>
+      <UsersEditView user={user} />
     </SettingsHeader>
   );
 };

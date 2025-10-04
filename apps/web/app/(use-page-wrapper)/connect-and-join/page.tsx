@@ -1,7 +1,5 @@
 import { _generateMetadata } from "app/_utils";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
-
 import LegacyPage from "~/connect-and-join/connect-and-join-view";
 
 export const generateMetadata = async () => {
@@ -16,9 +14,7 @@ export const generateMetadata = async () => {
 
 const ServerPage = async () => {
   return (
-    <LicenseRequired>
-      <LegacyPage />
-    </LicenseRequired>
+    <LegacyPage />
   );
 };
 export default ServerPage;

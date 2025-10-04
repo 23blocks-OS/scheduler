@@ -3,7 +3,6 @@ import { Controller, useForm } from "react-hook-form";
 
 import dayjs from "@calcom/dayjs";
 import type { TApiKeys } from "@calcom/ee/api-keys/components/ApiKeyListItem";
-import LicenseRequired from "@calcom/ee/common/components/LicenseRequired";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc/react";
 import { Button } from "@calcom/ui/components/button";
@@ -78,7 +77,7 @@ export default function ApiKeyDialogForm({
   ];
 
   return (
-    <LicenseRequired>
+    <>
       {successfulNewApiKeyModal ? (
         <>
           <div className="mb-6">
@@ -230,6 +229,6 @@ export default function ApiKeyDialogForm({
           </DialogFooter>
         </Form>
       )}
-    </LicenseRequired>
+    </>
   );
 }

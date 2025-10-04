@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useFormContext } from "react-hook-form";
 import { z } from "zod";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc/react";
 import { Button } from "@calcom/ui/components/button";
@@ -37,18 +36,16 @@ function CreateAttributesPage() {
 
   return (
     <>
-      <LicenseRequired>
-        <AttributeForm
-          header={<CreateAttributeHeader isPending={mutation.isPending} />}
-          onSubmit={(values) => {
-            const { attrName, ...rest } = values;
-            mutation.mutate({
-              ...rest,
-              name: attrName,
-            });
-          }}
-        />
-      </LicenseRequired>
+      <AttributeForm
+        header={<CreateAttributeHeader isPending={mutation.isPending} />}
+        onSubmit={(values) => {
+          const { attrName, ...rest } = values;
+          mutation.mutate({
+            ...rest,
+            name: attrName,
+          });
+        }}
+      />
     </>
   );
 }

@@ -4,7 +4,6 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import SkeletonLoaderTeamList from "@calcom/features/ee/teams/components/SkeletonloaderTeamList";
 import { CreateButtonWithTeamsList } from "@calcom/features/ee/teams/components/createButton/CreateButtonWithTeamsList";
 import { FilterResults } from "@calcom/features/filters/components/FilterResults";
@@ -133,8 +132,7 @@ export default function RoutingForms({ appUrl }: { appUrl: string }) {
   }
 
   return (
-    <LicenseRequired>
-      <ShellMain
+    <ShellMain
         heading={t("routing")}
         CTA={
           hasPaidPlan && forms?.length ? (
@@ -322,6 +320,5 @@ export default function RoutingForms({ appUrl }: { appUrl: string }) {
           </FormActionsProvider>
         </UpgradeTip>
       </ShellMain>
-    </LicenseRequired>
   );
 }

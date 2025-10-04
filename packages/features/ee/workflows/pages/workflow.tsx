@@ -24,7 +24,6 @@ import type { MultiSelectCheckboxesOptionType as Option } from "@calcom/ui/compo
 import { Form } from "@calcom/ui/components/form";
 import { showToast } from "@calcom/ui/components/toast";
 
-import LicenseRequired from "../../common/components/LicenseRequired";
 import SkeletonLoader from "../components/SkeletonLoaderEdit";
 import WorkflowDetailsPage from "../components/WorkflowDetailsPage";
 import { isSMSAction, isSMSOrWhatsappAction } from "../lib/actionHelperFunctions";
@@ -230,8 +229,7 @@ function WorkflowPage({
 
   return session.data ? (
     <Shell withoutMain backPath="/workflows">
-      <LicenseRequired>
-        <Form
+      <Form
           form={form}
           handleSubmit={async (values) => {
             let activeOnIds: number[] = [];
@@ -368,7 +366,6 @@ function WorkflowPage({
             )}
           </ShellMain>
         </Form>
-      </LicenseRequired>
     </Shell>
   ) : (
     <></>

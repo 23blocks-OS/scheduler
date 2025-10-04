@@ -21,7 +21,6 @@ import { showToast } from "@calcom/ui/components/toast";
 import { FilterResults } from "../../../filters/components/FilterResults";
 import { TeamsFilter } from "../../../filters/components/TeamsFilter";
 import { getTeamsFiltersFromQuery } from "../../../filters/lib/getTeamsFiltersFromQuery";
-import LicenseRequired from "../../common/components/LicenseRequired";
 import EmptyScreen from "../components/EmptyScreen";
 import SkeletonLoader from "../components/SkeletonLoaderList";
 import WorkflowList from "../components/WorkflowListPage";
@@ -67,8 +66,7 @@ function WorkflowsPage({ filteredList }: PageProps) {
 
   return (
     <Shell withoutMain>
-      <LicenseRequired>
-        <ShellMain
+      <ShellMain
           heading={t("workflows")}
           subtitle={t("workflows_to_automate_notifications")}
           title={t("workflows")}
@@ -112,7 +110,6 @@ function WorkflowsPage({ filteredList }: PageProps) {
             </FilterResults>
           </>
         </ShellMain>
-      </LicenseRequired>
     </Shell>
   );
 }

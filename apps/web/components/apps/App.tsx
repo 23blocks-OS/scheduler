@@ -1,4 +1,3 @@
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import Shell from "@calcom/features/shell/Shell";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 
@@ -13,13 +12,7 @@ const ShellHeading = () => {
 export default function WrappedApp(props: AppPageProps) {
   return (
     <Shell smallHeading isPublic heading={<ShellHeading />} backPath="/apps">
-      {props.licenseRequired ? (
-        <LicenseRequired>
-          <AppPage {...props} />
-        </LicenseRequired>
-      ) : (
-        <AppPage {...props} />
-      )}
+      <AppPage {...props} />
     </Shell>
   );
 }

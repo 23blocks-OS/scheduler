@@ -6,7 +6,6 @@ import { getParserWithGeneric } from "@calcom/prisma/zod-utils";
 import { trpc } from "@calcom/trpc/react";
 import { showToast } from "@calcom/ui/components/toast";
 
-import LicenseRequired from "../../common/components/LicenseRequired";
 import { UserForm } from "../components/UserForm";
 import { userBodySchema } from "../schemas/userBodySchema";
 
@@ -30,16 +29,14 @@ const UsersAddView = () => {
   });
   return (
     <div>
-      <LicenseRequired>
-        <UserForm
-          submitLabel="Add user"
-          onSubmit={async (values) => {
-            const parser = getParserWithGeneric(userBodySchema);
-            const parsedValues = parser(values);
-            mutation.mutate(parsedValues);
-          }}
-        />
-      </LicenseRequired>
+      <UserForm
+        submitLabel="Add user"
+        onSubmit={async (values) => {
+          const parser = getParserWithGeneric(userBodySchema);
+          const parsedValues = parser(values);
+          mutation.mutate(parsedValues);
+        }}
+      />
     </div>
   );
 };
