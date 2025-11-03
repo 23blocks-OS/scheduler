@@ -45,6 +45,9 @@ RUN echo "Building @calcom/embed-core..." && \
 RUN echo "Building @calcom/web..." && \
     NODE_OPTIONS="--max-old-space-size=8192" yarn workspace @calcom/web run build
 
+RUN echo "Building @calcom/api..." && \
+    NODE_OPTIONS="--max-old-space-size=8192" yarn workspace @calcom/api run build
+
 # Build and make embed servable from web/public/embed folder
 # Build with proper memory management and error handling
 # RUN set -e && \

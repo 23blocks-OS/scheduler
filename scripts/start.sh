@@ -9,6 +9,14 @@ scripts/wait-for-it.sh ${DATABASE_HOST} -- echo "database is up"
 npx prisma migrate deploy --schema /calcom/packages/prisma/schema.prisma
 npx ts-node --transpile-only /calcom/packages/prisma/seed-app-store.ts
 
-# Start both web (port 3000) and API v1 (port 3003) services using turbo
-echo "Starting Cal.com Web App and API v1..."
-turbo run start --scope="@calcom/web" --scope="@calcom/api"
+# Start both web (port 3000) and API v1 (port 3003) services
+echo "Starting Cal.com Web App on port 3000..."
+npx turbo run start --scope="@calcom/web" &
+WEB_PID=$!
+
+echo "Starting Cal.com API v1 on port 3003..."
+yarn workspace @calcom/api run start &
+API_PID=$!
+
+# Wait for both processes
+wait $WEB_PID $API_PID
