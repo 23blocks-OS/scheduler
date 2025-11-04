@@ -31,7 +31,7 @@ class LicenseKeyService implements ILicenseKeyService {
   // Static async factory method
   public static async create(deploymentRepo: IDeploymentRepository): Promise<ILicenseKeyService> {
     const licenseKey = await getDeploymentKey(deploymentRepo);
-    const useNoop = !licenseKey || process.env.NEXT_PUBLIC_IS_E2E === "1";
+    const useNoop = !licenseKey || process.env.NEXT_PUBLIC_IS_E2E === "1" || process.env.CALCOM_TELEMETRY_DISABLED === "1";
     return !useNoop ? new LicenseKeyService(licenseKey) : new NoopLicenseKeyService();
   }
 
@@ -112,7 +112,11 @@ export class NoopLicenseKeyService implements ILicenseKeyService {
   }
 
   async checkLicense(): Promise<boolean> {
-    return Promise.resolve(process.env.NEXT_PUBLIC_IS_E2E === "1");
+    // Return true for E2E tests or air-gapped deployments
+    return Promise.resolve(
+      process.env.NEXT_PUBLIC_IS_E2E === "1" ||
+      process.env.CALCOM_TELEMETRY_DISABLED === "1"
+    );
   }
 }
 
