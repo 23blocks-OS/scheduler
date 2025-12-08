@@ -138,7 +138,8 @@ function OrganizationAttributesPage() {
   }
 
   return (
-    <div className="border-subtle bg-default flex flex-col gap-4 rounded-lg border p-6">
+    <>
+      <div className="border-subtle bg-default flex flex-col gap-4 rounded-lg border p-6">
         {data && data?.length > 0 ? (
           <>
             <h2 className="text-emphasis text-base font-semibold leading-none">{t("custom")}</h2>
@@ -187,7 +188,7 @@ function OrganizationAttributesPage() {
           setAttributeToDelete={setAttributeToDelete}
         />
       )}
-    </div>
+    </>
   );
 }
 
