@@ -24,11 +24,18 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 BUILD_NUMBER := $(shell git rev-list --count HEAD 2>/dev/null || echo "0")
 
+# Tenant-specific configuration (override these per deployment)
+# Usage: make staging-build TERMS_URL=https://example.com/terms PRIVACY_URL=https://example.com/privacy
+TERMS_URL ?= https://cal.com/terms
+PRIVACY_URL ?= https://cal.com/privacy
+
 # Docker build arguments for Cal.com
 DOCKER_BUILD_ARGS = \
 	--build-arg BUILD_DATE=$(BUILD_DATE) \
 	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
-	--build-arg CALCOM_TELEMETRY_DISABLED=1
+	--build-arg CALCOM_TELEMETRY_DISABLED=1 \
+	--build-arg NEXT_PUBLIC_WEBSITE_TERMS_URL=$(TERMS_URL) \
+	--build-arg NEXT_PUBLIC_WEBSITE_PRIVACY_POLICY_URL=$(PRIVACY_URL)
 
 # Version management
 .PHONY: version version-bump-patch version-bump-minor version-bump-major
@@ -254,3 +261,5 @@ help:
 	@echo "  REGISTRY_URL             - ECR registry URL"
 	@echo "  AWS_REGION               - AWS region (default: us-east-2)"
 	@echo "  AWS_PROFILE              - AWS profile (default: staging.23blocks)"
+	@echo "  TERMS_URL                - Terms of Service URL (default: https://cal.com/terms)"
+	@echo "  PRIVACY_URL              - Privacy Policy URL (default: https://cal.com/privacy)"
