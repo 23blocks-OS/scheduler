@@ -11,7 +11,7 @@ npx ts-node --transpile-only /calcom/packages/prisma/seed-app-store.ts
 
 # Start both web (port 3000) and API v1 (port 3003) services
 echo "Starting Cal.com Web App on port 3000..."
-npx turbo run start --scope="@calcom/web" &
+npx turbo run start --filter="@calcom/web" &
 WEB_PID=$!
 
 echo "Starting Cal.com API v1 on port 3003..."
