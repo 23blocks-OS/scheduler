@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { MemberInvitationModalWithoutMembers } from "@calcom/features/ee/teams/components/MemberInvitationModal";
 import MemberList from "@calcom/features/ee/teams/components/MemberList";
 import type { MemberPermissions } from "@calcom/features/users/components/UserTable/types";
@@ -41,7 +40,7 @@ export const TeamMembersView = ({ team, facetedTeamValues, permissions }: TeamMe
   const canLoggedInUserSeeMembers = permissions?.canListMembers ?? false;
 
   return (
-    <LicenseRequired>
+    <>
       <div>
         {canLoggedInUserSeeMembers && (
           <div className="mb-6">
@@ -69,6 +68,6 @@ export const TeamMembersView = ({ team, facetedTeamValues, permissions }: TeamMe
           />
         )}
       </div>
-    </LicenseRequired>
+    </>
   );
 };

@@ -1,6 +1,5 @@
 "use client";
 
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { trpc } from "@calcom/trpc/react";
 import { SkeletonContainer, SkeletonText, SkeletonButton } from "@calcom/ui/components/skeleton";
 
@@ -32,7 +31,7 @@ const GuestNotificationsView = ({ permissions }: { permissions: { canRead: boole
   if (!currentOrg.organizationSettings) return null;
 
   return (
-    <LicenseRequired>
+    <>
       <div className="space-y-8">
         <DisableGuestBookingEmailsSetting
           orgId={currentOrg.id}
@@ -58,7 +57,7 @@ const GuestNotificationsView = ({ permissions }: { permissions: { canRead: boole
           readOnly={isDisabled}
         />
       </div>
-    </LicenseRequired>
+    </>
   );
 };
 

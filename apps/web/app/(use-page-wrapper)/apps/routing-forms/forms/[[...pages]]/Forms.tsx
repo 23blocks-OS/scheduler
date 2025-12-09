@@ -8,7 +8,6 @@ import posthog from "posthog-js";
 import { isFallbackRoute } from "@calcom/app-store/routing-forms/lib/isFallbackRoute";
 import type { RoutingFormWithResponseCount } from "@calcom/app-store/routing-forms/types/types";
 import { useHasPaidPlan } from "@calcom/features/billing/hooks/useHasPaidPlan";
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import SkeletonLoaderTeamList from "@calcom/features/ee/teams/components/SkeletonloaderTeamList";
 import { CreateButtonWithTeamsList } from "@calcom/features/ee/teams/components/createButton/CreateButtonWithTeamsList";
 import { FilterResults } from "@calcom/features/filters/components/FilterResults";
@@ -146,7 +145,7 @@ export default function RoutingForms({ appUrl }: { appUrl: string }) {
   }
 
   return (
-    <LicenseRequired>
+    <>
       <ShellMain
         heading={t("routing")}
         CTA={
@@ -335,6 +334,6 @@ export default function RoutingForms({ appUrl }: { appUrl: string }) {
           </FormActionsProvider>
         </UpgradeTip>
       </ShellMain>
-    </LicenseRequired>
+    </>
   );
 }
