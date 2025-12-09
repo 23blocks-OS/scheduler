@@ -1,8 +1,7 @@
 import { calendar_v3 } from "@googleapis/calendar";
-import type { Membership, Team, UserPermissionRole } from "@prisma/client";
 import { waitUntil } from "@vercel/functions";
 import { OAuth2Client } from "googleapis-common";
-import type { AuthOptions, Session, User } from "next-auth";
+import type { AuthOptions, Account, Session, User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { encode } from "next-auth/jwt";
 import type { Provider } from "next-auth/providers";
@@ -13,10 +12,15 @@ import GoogleProvider from "next-auth/providers/google";
 import { updateProfilePhotoGoogle } from "@calcom/app-store/_utils/oauth/updateProfilePhotoGoogle";
 import GoogleCalendarService from "@calcom/app-store/googlecalendar/lib/CalendarService";
 import { LicenseKeySingleton } from "@calcom/ee/common/server/LicenseKeyService";
+import { CredentialRepository } from "@calcom/features/credentials/repositories/CredentialRepository";
 import createUsersAndConnectToOrg from "@calcom/features/ee/dsync/lib/users/createUsersAndConnectToOrg";
 import ImpersonationProvider from "@calcom/features/ee/impersonation/lib/ImpersonationProvider";
+import { getOrganizationRepository } from "@calcom/features/ee/organizations/di/OrganizationRepository.container";
 import { getOrgFullOrigin, subdomainSuffix } from "@calcom/features/ee/organizations/lib/orgDomains";
 import { clientSecretVerifier, hostedCal, isSAMLLoginEnabled } from "@calcom/features/ee/sso/lib/saml";
+import { ProfileRepository } from "@calcom/features/profile/repositories/ProfileRepository";
+import { UserRepository } from "@calcom/features/users/repositories/UserRepository";
+import { isPasswordValid } from "@calcom/lib/auth/isPasswordValid";
 import { checkRateLimitAndThrowError } from "@calcom/lib/checkRateLimitAndThrowError";
 import {
   GOOGLE_CALENDAR_SCOPES,
@@ -31,23 +35,54 @@ import { isENVDev } from "@calcom/lib/env";
 import logger from "@calcom/lib/logger";
 import { randomString } from "@calcom/lib/random";
 import { safeStringify } from "@calcom/lib/safeStringify";
-import { CredentialRepository } from "@calcom/lib/server/repository/credential";
+import { hashEmail } from "@calcom/lib/server/PiiHasher";
 import { DeploymentRepository } from "@calcom/lib/server/repository/deployment";
-import { OrganizationRepository } from "@calcom/lib/server/repository/organization";
-import { ProfileRepository } from "@calcom/lib/server/repository/profile";
-import { UserRepository } from "@calcom/lib/server/repository/user";
 import slugify from "@calcom/lib/slugify";
 import prisma from "@calcom/prisma";
+import type { Membership, Team } from "@calcom/prisma/client";
 import { CreationSource } from "@calcom/prisma/enums";
-import { IdentityProvider, MembershipRole } from "@calcom/prisma/enums";
+import { IdentityProvider, MembershipRole, UserPermissionRole } from "@calcom/prisma/enums";
 import { teamMetadataSchema, userMetadata } from "@calcom/prisma/zod-utils";
 
 import { getOrgUsernameFromEmail } from "../signup/utils/getOrgUsernameFromEmail";
 import { ErrorCode } from "./ErrorCode";
 import { dub } from "./dub";
-import { isPasswordValid } from "./isPasswordValid";
 import CalComAdapter from "./next-auth-custom-adapter";
 import { verifyPassword } from "./verifyPassword";
+
+type UserWithProfiles = NonNullable<
+  Awaited<ReturnType<UserRepository["findByEmailAndIncludeProfilesAndPassword"]>>
+>;
+
+// This adapts our internal user model to what NextAuth expects
+// NextAuth core requires id to be a string, so we handle that here
+const AdapterUserPresenter = {
+  fromCalUser: (
+    user: UserWithProfiles,
+    role: UserPermissionRole | "INACTIVE_ADMIN",
+    hasActiveTeams: boolean
+  ) => ({
+    ...user,
+    role: role as UserPermissionRole,
+    belongsToActiveTeam: hasActiveTeams,
+    profile: user.allProfiles[0],
+  }),
+};
+
+// Account presenter to handle linkAccount calls
+const AdapterAccountPresenter = {
+  fromCalAccount: (account: Account, userId: number, providerEmail: string) => {
+    return {
+      ...account,
+      userId: String(userId), // Convert userId to string for Next Auth
+      providerEmail,
+      // Ensure these required fields are present
+      provider: account.provider,
+      providerAccountId: account.providerAccountId,
+      type: account.type,
+    };
+  },
+};
 
 const log = logger.getSubLogger({ prefix: ["next-auth-options"] });
 const GOOGLE_API_CREDENTIALS = process.env.GOOGLE_API_CREDENTIALS || "{}";
@@ -62,7 +97,7 @@ const usernameSlug = (username: string) => `${slugify(username)}-${randomString(
 const getDomainFromEmail = (email: string): string => email.split("@")[1];
 
 const loginWithTotp = async (email: string) =>
-  `/auth/login?totp=${await (await import("./signJwt")).default({ email })}`;
+  `/auth/login?totp=${encodeURIComponent(await (await import("./signJwt")).default({ email }))}`;
 
 type UserTeams = {
   teams: (Membership & {
@@ -109,14 +144,15 @@ const providers: Provider[] = [
       totpCode: { label: "Two-factor Code", type: "input", placeholder: "Code from authenticator app" },
       backupCode: { label: "Backup Code", type: "input", placeholder: "Two-factor backup code" },
     },
-    async authorize(credentials) {
+    async authorize(credentials): Promise<User | null> {
       log.debug("CredentialsProvider:credentials:authorize", safeStringify({ credentials }));
       if (!credentials) {
         console.error(`For some reason credentials are missing`);
         throw new Error(ErrorCode.InternalServerError);
       }
 
-      const user = await UserRepository.findByEmailAndIncludeProfilesAndPassword({
+      const userRepo = new UserRepository(prisma);
+      const user = await userRepo.findByEmailAndIncludeProfilesAndPassword({
         email: credentials.email,
       });
       // Don't leak information about it being username or password that is invalid
@@ -130,24 +166,18 @@ const providers: Provider[] = [
       }
 
       await checkRateLimitAndThrowError({
-        identifier: user.email,
+        identifier: hashEmail(user.email),
       });
 
-      if (!user.password?.hash && user.identityProvider !== IdentityProvider.CAL && !credentials.totpCode) {
-        throw new Error(ErrorCode.IncorrectEmailPassword);
-      }
-      if (!user.password?.hash && user.identityProvider == IdentityProvider.CAL) {
+      // Users without a password must use their identity provider (Google/SAML) to login
+      if (!user.password?.hash) {
         throw new Error(ErrorCode.IncorrectEmailPassword);
       }
 
-      if (user.password?.hash && !credentials.totpCode) {
-        if (!user.password?.hash) {
-          throw new Error(ErrorCode.IncorrectEmailPassword);
-        }
-        const isCorrectPassword = await verifyPassword(credentials.password, user.password.hash);
-        if (!isCorrectPassword) {
-          throw new Error(ErrorCode.IncorrectEmailPassword);
-        }
+      // Always verify password for users who have one
+      const isCorrectPassword = await verifyPassword(credentials.password, user.password.hash);
+      if (!isCorrectPassword) {
+        throw new Error(ErrorCode.IncorrectEmailPassword);
       }
 
       if (user.twoFactorEnabled && credentials.backupCode) {
@@ -213,7 +243,7 @@ const providers: Provider[] = [
       // authentication success- but does it meet the minimum password requirements?
       const validateRole = (role: UserPermissionRole) => {
         // User's role is not "ADMIN"
-        if (role !== "ADMIN") return role;
+        if (role !== UserPermissionRole.ADMIN) return role;
         // User's identity provider is not "CAL"
         if (user.identityProvider !== IdentityProvider.CAL) return role;
 
@@ -230,17 +260,8 @@ const providers: Provider[] = [
         return "INACTIVE_ADMIN";
       };
 
-      return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        name: user.name,
-        role: validateRole(user.role),
-        belongsToActiveTeam: hasActiveTeams,
-        locale: user.locale,
-        profile: user.allProfiles[0],
-        createdDate: user.createdDate,
-      };
+      // Create a NextAuth compatible user object using our presenter
+      return AdapterUserPresenter.fromCalUser(user, validateRole(user.role), hasActiveTeams);
     },
   }),
   ImpersonationProvider,
@@ -291,7 +312,8 @@ if (isSAMLLoginEnabled) {
       locale?: string;
     }) => {
       log.debug("BoxyHQ:profile", safeStringify({ profile }));
-      const user = await UserRepository.findByEmailAndIncludeProfilesAndPassword({
+      const userRepo = new UserRepository(prisma);
+      const user = await userRepo.findByEmailAndIncludeProfilesAndPassword({
         email: profile.email || "",
       });
       return {
@@ -355,14 +377,14 @@ if (isSAMLLoginEnabled) {
 
         const { id, firstName, lastName } = userInfo;
         const email = userInfo.email.toLowerCase();
-        let user = !email
-          ? undefined
-          : await UserRepository.findByEmailAndIncludeProfilesAndPassword({ email });
+        const userRepo = new UserRepository(prisma);
+        let user = !email ? undefined : await userRepo.findByEmailAndIncludeProfilesAndPassword({ email });
         if (!user) {
           const hostedCal = Boolean(HOSTED_CAL_FEATURES);
           if (hostedCal && email) {
             const domain = getDomainFromEmail(email);
-            const org = await OrganizationRepository.getVerifiedOrganizationByAutoAcceptEmailDomain(domain);
+            const organizationRepository = getOrganizationRepository();
+            const org = await organizationRepository.getVerifiedOrganizationByAutoAcceptEmailDomain(domain);
             if (org) {
               const createUsersAndConnectToOrgProps = {
                 emailsToCreate: [email],
@@ -373,14 +395,14 @@ if (isSAMLLoginEnabled) {
                 createUsersAndConnectToOrgProps,
                 org,
               });
-              user = await UserRepository.findByEmailAndIncludeProfilesAndPassword({
+              user = await userRepo.findByEmailAndIncludeProfilesAndPassword({
                 email: email,
               });
             }
           }
           if (!user) throw new Error(ErrorCode.UserNotFound);
         }
-        const [userProfile] = user?.allProfiles;
+        const [userProfile] = user?.allProfiles ?? [];
         return {
           id: id as unknown as number,
           firstName,
@@ -490,7 +512,6 @@ export const getOptions = ({
       }
       const autoMergeIdentities = async () => {
         const existingUser = await prisma.user.findFirst({
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           where: { email: token.email! },
           select: {
             id: true,
@@ -503,7 +524,12 @@ export const getOptions = ({
             movedToProfileId: true,
             teams: {
               include: {
-                team: true,
+                team: {
+                  select: {
+                    id: true,
+                    metadata: true,
+                  },
+                },
               },
             },
           },
@@ -525,7 +551,7 @@ export const getOptions = ({
         );
         const { upId } = determineProfile({ profiles: allProfiles, token });
 
-        const profile = await ProfileRepository.findByUpId(upId);
+        const profile = await ProfileRepository.findByUpIdWithAuth(upId, existingUser.id);
         if (!profile) {
           throw new Error("Profile not found");
         }
@@ -629,7 +655,7 @@ export const getOptions = ({
         if (
           account.provider === "google" &&
           !(await CredentialRepository.findFirstByAppIdAndUserId({
-            userId: user.id as number,
+            userId: Number(user.id),
             appId: "google-calendar",
           })) &&
           GOOGLE_CALENDAR_SCOPES.every((scope) => grantedScopes.includes(scope))
@@ -643,7 +669,7 @@ export const getOptions = ({
             expires_at: account.expires_at,
           };
           const gcalCredential = await CredentialRepository.create({
-            userId: user.id as number,
+            userId: Number(user.id),
             key: credentialkey,
             appId: "google-calendar",
             type: "google_calendar",
@@ -656,14 +682,14 @@ export const getOptions = ({
 
           if (
             !(await CredentialRepository.findFirstByUserIdAndType({
-              userId: user.id as number,
+              userId: Number(user.id),
               type: "google_video",
             }))
           ) {
             await CredentialRepository.create({
               type: "google_video",
               key: {},
-              userId: user.id as number,
+              userId: Number(user.id),
               appId: "google-meet",
             });
           }
@@ -677,10 +703,10 @@ export const getOptions = ({
           if (primaryCal?.id) {
             await gCalService.createSelectedCalendar({
               externalId: primaryCal.id,
-              userId: user.id as number,
+              userId: Number(user.id),
             });
           }
-          await updateProfilePhotoGoogle(oAuth2Client, user.id as number);
+          await updateProfilePhotoGoogle(oAuth2Client, Number(user.id));
         }
         const allProfiles = await ProfileRepository.findAllProfilesForUserIncludingMovedUser(existingUser);
         const { upId } = determineProfile({ profiles: allProfiles, token });
@@ -737,7 +763,7 @@ export const getOptions = ({
       };
       return calendsoSession;
     },
-    async signIn(params) {
+    async signIn(params): Promise<boolean | string> {
       const {
         /**
          * Available when Credentials provider is used - Has the value returned by authorize callback
@@ -787,6 +813,11 @@ export const getOptions = ({
 
         let existingUser = await prisma.user.findFirst({
           include: {
+            password: {
+              select: {
+                hash: true,
+              },
+            },
             accounts: {
               where: {
                 provider: account.provider,
@@ -803,6 +834,11 @@ export const getOptions = ({
         if (!existingUser) {
           existingUser = await prisma.user.findFirst({
             include: {
+              password: {
+                select: {
+                  hash: true,
+                },
+              },
               accounts: {
                 where: {
                   provider: account.provider,
@@ -833,11 +869,11 @@ export const getOptions = ({
             try {
               // If old user without Account entry we link their google account
               if (existingUser.accounts.length === 0) {
-                const linkAccountWithUserData = {
-                  ...account,
-                  userId: existingUser.id,
-                  providerEmail: user.email,
-                };
+                const linkAccountWithUserData = AdapterAccountPresenter.fromCalAccount(
+                  account,
+                  existingUser.id,
+                  user.email
+                );
                 await calcomAdapter.linkAccount(linkAccountWithUserData);
               }
             } catch (error) {
@@ -883,7 +919,11 @@ export const getOptions = ({
             },
           },
           include: {
-            password: true,
+            password: {
+              select: {
+                hash: true,
+              },
+            },
           },
         });
 
@@ -916,7 +956,7 @@ export const getOptions = ({
                 email: user.email,
                 // Slugify the incoming name and append a few random characters to
                 // prevent conflicts for users with the same name.
-                username: getOrgUsernameFromEmail(user.name, getDomainFromEmail(user.email)),
+                username: getOrgUsernameFromEmail(user.email, getDomainFromEmail(user.email)),
                 emailVerified: new Date(Date.now()),
                 name: user.name,
                 identityProvider: idP,
@@ -1001,7 +1041,11 @@ export const getOptions = ({
               creationSource: CreationSource.WEBAPP,
             },
           });
-          const linkAccountNewUserData = { ...account, userId: newUser.id, providerEmail: user.email };
+          const linkAccountNewUserData = AdapterAccountPresenter.fromCalAccount(
+            account,
+            newUser.id,
+            user.email
+          );
           await calcomAdapter.linkAccount(linkAccountNewUserData);
 
           if (account.twoFactorEnabled) {
@@ -1040,7 +1084,7 @@ export const getOptions = ({
         createdDate: string;
       };
       // check if the user was created in the last 10 minutes
-      // this is a workaround – in the future once we move to use the Account model in the DB
+      // this is a workaround – in the future once we move to use the Account model in the DB
       // we should use NextAuth's isNewUser flag instead: https://next-auth.js.org/configuration/events#signin
       const isNewUser = new Date(user.createdDate) > new Date(Date.now() - 10 * 60 * 1000);
       if ((isENVDev || IS_CALCOM) && isNewUser) {
@@ -1048,7 +1092,7 @@ export const getOptions = ({
           const clickId = getDubId();
           // check if there's a clickId (dub_id) cookie set by @dub/analytics
           if (clickId) {
-            // here we use waitUntil – meaning this code will run async to not block the main thread
+            // here we use waitUntil – meaning this code will run async to not block the main thread
             waitUntil(
               // if so, send a lead event to Dub
               // @see https://d.to/conversions/next-auth

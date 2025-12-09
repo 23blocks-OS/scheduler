@@ -5,9 +5,10 @@ import { useFormContext, Controller } from "react-hook-form";
 import { z } from "zod";
 
 import PhoneInput from "@calcom/features/components/phone-input";
-import { getTemplateFieldsSchema } from "@calcom/features/ee/cal-ai-phone/getTemplateFieldsSchema";
-import { TEMPLATES_FIELDS } from "@calcom/features/ee/cal-ai-phone/template-fields-map";
-import type { TemplateType } from "@calcom/features/ee/cal-ai-phone/zod-utils";
+import { getTemplateFieldsSchema } from "@calcom/features/calAIPhone/getTemplateFieldsSchema";
+import { templateFieldsMap } from "@calcom/features/calAIPhone/template-fields-map";
+import type { TemplateType } from "@calcom/features/calAIPhone/zod-utils";
+import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import type { EventTypeSetup, FormValues } from "@calcom/features/eventtypes/lib/types";
 import { ComponentForField } from "@calcom/features/form-builder/FormBuilderField";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
@@ -38,7 +39,8 @@ export default function AIEventController({ eventType, isTeamEvent }: AIEventCon
   if (session.status === "loading") return <></>;
 
   return (
-    <div className="block items-start sm:flex">
+    <LicenseRequired>
+      <div className="block items-start sm:flex">
         {!isOrg || !isTeamEvent ? (
           <EmptyScreen
             headline={t("Cal.ai")}
@@ -80,6 +82,7 @@ export default function AIEventController({ eventType, isTeamEvent }: AIEventCon
           </div>
         )}
       </div>
+    </LicenseRequired>
   );
 }
 
@@ -99,10 +102,10 @@ const TemplateFields = () => {
   const { control, watch } = formMethods;
 
   const templateType = watch("aiPhoneCallConfig.templateType");
-  const fields = TEMPLATES_FIELDS[templateType as TemplateType];
+  const fields = templateFieldsMap[templateType as TemplateType];
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {fields?.map((field) => (
         <div key={field.name}>
           <Controller
@@ -196,7 +199,7 @@ const AISettings = ({ eventType }: { eventType: EventTypeSetup }) => {
 
   return (
     <div>
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <>
           <Label>{t("your_phone_number")}</Label>
           <Controller

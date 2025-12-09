@@ -8,7 +8,7 @@ import {
   addDarkColorSchemeChangeListener,
   getMaxHeightForModal,
 } from "./ui-utils";
-
+import type { ExternalThemeClass } from "./ui/themeClass";
 type ShadowRootWithStyle = ShadowRoot & {
   host: HTMLElement & { style: CSSStyleDeclaration };
 };
@@ -19,7 +19,7 @@ export class EmbedElement extends HTMLElement {
   public isModal!: boolean;
   public skeletonContainerHeightTimer: number | null = null;
   // Theme Class is derived from `this.theme` as well as system color scheme preference
-  public themeClass!: string;
+  public themeClass!: ExternalThemeClass;
   public layout!: AllPossibleLayouts;
   public getSkeletonData!: (_args: { layout: AllPossibleLayouts; pageType: EmbedPageType | null }) => {
     skeletonContent: string;
@@ -31,12 +31,8 @@ export class EmbedElement extends HTMLElement {
   private boundPrefersDarkThemeChangedHandler: (e: MediaQueryListEvent) => void;
   private isSkeletonSupportedPageType() {
     const pageType = this.getPageType();
-    return (
-      pageType === "user.event.booking.slots" ||
-      pageType === "team.event.booking.slots" ||
-      pageType === "user.event.booking.form" ||
-      pageType === "team.event.booking.form"
-    );
+    // Any pageType being set is considered as skeleton supported. There is always a fallback skeleton loader if no direct match for a skeleton loader is found based on pageType
+    return !!pageType;
   }
   public assertHasShadowRoot(): asserts this is HTMLElement & { shadowRoot: ShadowRootWithStyle } {
     if (!this.shadowRoot) {
@@ -44,8 +40,8 @@ export class EmbedElement extends HTMLElement {
     }
   }
 
-  public getPageType(): EmbedPageType {
-    return this.dataset.pageType as EmbedPageType;
+  public getPageType(): EmbedPageType | undefined {
+    return this.dataset.pageType as EmbedPageType | undefined;
   }
   public getLayout(): AllPossibleLayouts {
     return getTrueLayout({ layout: (this.dataset.layout as BookerLayouts | undefined) ?? null });

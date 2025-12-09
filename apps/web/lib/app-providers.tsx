@@ -1,26 +1,34 @@
+/**
+ * PAGES ROUTER ONLY - Used exclusively by Next.js Pages Router (_app.tsx)
+ * 
+ * Currently only serves the /router endpoint (routing forms redirect page).
+ * DO NOT add new features here - this file will be deprecated once we remove apps/web/pages.
+ * 
+ * For App Router, use app-providers-app-dir.tsx instead.
+ */
+
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { dir } from "i18next";
 import type { Session } from "next-auth";
 import { useSession } from "next-auth/react";
-import { EventCollectionProvider } from "next-collect/client";
 import { appWithTranslation } from "next-i18next";
 import type { SSRConfig } from "next-i18next/dist/types/types";
 import { ThemeProvider } from "next-themes";
 import type { AppProps as NextAppProps, AppProps as NextJsAppProps } from "next/app";
 import dynamic from "next/dynamic";
+import { NuqsAdapter } from "nuqs/adapters/next/pages";
 import type { ParsedUrlQuery } from "querystring";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useEffect } from "react";
 
-import DynamicPostHogProvider from "@calcom/features/ee/event-tracking/lib/posthog/providerDynamic";
 import { OrgBrandingProvider } from "@calcom/features/ee/organizations/context/provider";
 import DynamicHelpscoutProvider from "@calcom/features/ee/support/lib/helpscout/providerDynamic";
+import DynamicIntercomProvider from "@calcom/features/ee/support/lib/intercom/providerDynamic";
 import { FeatureProvider } from "@calcom/features/flags/context/provider";
 import { useFlags } from "@calcom/features/flags/hooks";
 
 import useIsBookingPage from "@lib/hooks/useIsBookingPage";
 import type { WithLocaleProps } from "@lib/withLocale";
-import type { WithNonceProps } from "@lib/withNonce";
 
 import { useViewerI18n } from "@components/I18nLanguageHandler";
 
@@ -33,13 +41,11 @@ const I18nextAdapter = appWithTranslation<
 // Workaround for https://github.com/vercel/next.js/issues/8592
 export type AppProps = Omit<
   NextAppProps<
-    WithLocaleProps<
-      WithNonceProps<{
-        themeBasis?: string;
-        session: Session;
-        i18n?: SSRConfig;
-      }>
-    >
+    WithLocaleProps<{
+      themeBasis?: string;
+      session: Session;
+      i18n?: SSRConfig;
+    }>
   >,
   "Component"
 > & {
@@ -55,12 +61,6 @@ export type AppProps = Omit<
   err?: Error;
 };
 
-const PostHogPageView = dynamic(
-  () => import("@calcom/features/ee/event-tracking/lib/posthog/web/PostHogPageView"),
-  {
-    ssr: false,
-  }
-);
 
 type AppPropsWithChildren = AppProps & {
   children: ReactNode;
@@ -72,12 +72,7 @@ const getEmbedNamespace = (query: ParsedUrlQuery) => {
   return typeof window !== "undefined" ? window.getEmbedNamespace() : (query.embed as string) || null;
 };
 
-// We dont need to pass nonce to the i18n provider - this was causing x2-x3 re-renders on a hard refresh
-type AppPropsWithoutNonce = Omit<AppPropsWithChildren, "pageProps"> & {
-  pageProps: Omit<AppPropsWithChildren["pageProps"], "nonce">;
-};
-
-const CustomI18nextProvider = (props: AppPropsWithoutNonce) => {
+const CustomI18nextProvider = (props: AppPropsWithChildren) => {
   /**
    * i18n should never be clubbed with other queries, so that it's caching can be managed independently.
    **/
@@ -141,8 +136,8 @@ const enum ThemeSupport {
 
 type CalcomThemeProps = PropsWithChildren<
   Pick<AppProps, "router"> &
-    Pick<AppProps["pageProps"], "nonce" | "themeBasis"> &
-    Pick<AppProps["Component"], "isBookingPage" | "isThemeSupported">
+  Pick<AppProps["pageProps"], "themeBasis"> &
+  Pick<AppProps["Component"], "isBookingPage" | "isThemeSupported">
 >;
 const CalcomThemeProvider = (props: CalcomThemeProps) => {
   // Use namespace of embed to ensure same namespaced embed are displayed with same theme. This allows different embeds on the same website to be themed differently
@@ -216,8 +211,8 @@ function getThemeProviderProps({
     ? ThemeSupport.Booking
     : // if isThemeSupported is explicitly false, we don't use theme there
     props.isThemeSupported === false
-    ? ThemeSupport.None
-    : ThemeSupport.App;
+      ? ThemeSupport.None
+      : ThemeSupport.App;
 
   const isBookingPageThemeSupportRequired = themeSupport === ThemeSupport.Booking;
   const themeBasis = props.themeBasis;
@@ -241,19 +236,18 @@ function getThemeProviderProps({
 
   const storageKey = isEmbedMode
     ? // Same Namespace, Same Organizer but different themes would still work seamless and not cause theme flicker
-      // Even though it's recommended to use different namespaces when you want to theme differently on the same page but if the embeds are on different pages, the problem can still arise
-      `embed-theme-${embedNamespace}${appearanceIdSuffix}${embedExplicitlySetThemeSuffix}`
+    // Even though it's recommended to use different namespaces when you want to theme differently on the same page but if the embeds are on different pages, the problem can still arise
+    `embed-theme-${embedNamespace}${appearanceIdSuffix}${embedExplicitlySetThemeSuffix}`
     : themeSupport === ThemeSupport.App
-    ? "app-theme"
-    : isBookingPageThemeSupportRequired
-    ? `booking-theme${appearanceIdSuffix}`
-    : undefined;
+      ? "app-theme"
+      : isBookingPageThemeSupportRequired
+        ? `booking-theme${appearanceIdSuffix}`
+        : undefined;
 
   return {
     storageKey,
     forcedTheme,
     themeSupport,
-    nonce: props.nonce,
     enableColorScheme: false,
     enableSystem: themeSupport !== ThemeSupport.None,
     // next-themes doesn't listen to changes on storageKey. So we need to force a re-render when storageKey changes
@@ -280,34 +274,33 @@ function OrgBrandProvider({ children }: { children: React.ReactNode }) {
 
 const AppProviders = (props: AppPropsWithChildren) => {
   const isBookingPage = useIsBookingPage();
-  const { pageProps, ...rest } = props;
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { nonce, ...restPageProps } = pageProps;
-  const propsWithoutNonce = {
-    pageProps: {
-      ...restPageProps,
-    },
-    ...rest,
-  };
+  const _isBookingPage =
+    (typeof props.Component.isBookingPage === "function"
+      ? props.Component.isBookingPage({ router: props.router })
+      : props.Component.isBookingPage) || isBookingPage;
 
   const RemainingProviders = (
-    <EventCollectionProvider options={{ apiPath: "/api/collect-events" }}>
-      <CustomI18nextProvider {...propsWithoutNonce}>
-        <TooltipProvider>
-          <CalcomThemeProvider
-            themeBasis={props.pageProps.themeBasis}
-            nonce={props.pageProps.nonce}
-            isThemeSupported={props.Component.isThemeSupported}
-            isBookingPage={props.Component.isBookingPage || isBookingPage}
-            router={props.router}>
+    <CustomI18nextProvider {...props}>
+      <TooltipProvider>
+        <CalcomThemeProvider
+          themeBasis={props.pageProps.themeBasis}
+          isThemeSupported={props.Component.isThemeSupported}
+          isBookingPage={props.Component.isBookingPage || isBookingPage}
+          router={props.router}>
+          <NuqsAdapter>
             <FeatureFlagsProvider>
-              <OrgBrandProvider>{props.children}</OrgBrandProvider>
+              {_isBookingPage ? (
+                <OrgBrandProvider>{props.children}</OrgBrandProvider>
+              ) : (
+                <DynamicIntercomProvider>
+                  <OrgBrandProvider>{props.children}</OrgBrandProvider>
+                </DynamicIntercomProvider>
+              )}
             </FeatureFlagsProvider>
-          </CalcomThemeProvider>
-        </TooltipProvider>
-      </CustomI18nextProvider>
-    </EventCollectionProvider>
+          </NuqsAdapter>
+        </CalcomThemeProvider>
+      </TooltipProvider>
+    </CustomI18nextProvider>
   );
 
   if (isBookingPage) {
@@ -316,12 +309,7 @@ const AppProviders = (props: AppPropsWithChildren) => {
 
   return (
     <>
-      <DynamicHelpscoutProvider>
-        <DynamicPostHogProvider>
-          <PostHogPageView />
-          {RemainingProviders}
-        </DynamicPostHogProvider>
-      </DynamicHelpscoutProvider>
+      <DynamicHelpscoutProvider>{RemainingProviders}</DynamicHelpscoutProvider>
     </>
   );
 };

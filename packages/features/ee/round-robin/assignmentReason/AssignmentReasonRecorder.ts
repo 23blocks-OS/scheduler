@@ -1,6 +1,6 @@
+import { acrossQueryValueCompatiblity } from "@calcom/app-store/_utils/raqb/raqbUtils";
 import type { FormResponse, Fields } from "@calcom/app-store/routing-forms/types/types";
 import { zodRoutes } from "@calcom/app-store/routing-forms/zod";
-import { acrossQueryValueCompatiblity } from "@calcom/lib/raqb/raqbUtils";
 import { withReporting } from "@calcom/lib/sentryWrapper";
 import { getUsersAttributes } from "@calcom/lib/service/attribute/server/getAttributes";
 import prisma from "@calcom/prisma";
@@ -149,18 +149,25 @@ export default class AssignmentReasonRecorder {
     teamMemberEmail,
     recordType,
     routingFormResponseId,
+    recordId,
   }: {
     bookingId: number;
     crmAppSlug: string;
     teamMemberEmail: string;
     recordType: string;
     routingFormResponseId: number;
+    recordId?: string;
   }) {
     const appAssignmentReasonHandler = (await import("./appAssignmentReasonHandler")).default;
     const appHandler = appAssignmentReasonHandler[crmAppSlug];
     if (!appHandler) return;
 
-    const crmRoutingReason = await appHandler({ recordType, teamMemberEmail, routingFormResponseId });
+    const crmRoutingReason = await appHandler({
+      recordType,
+      teamMemberEmail,
+      routingFormResponseId,
+      recordId,
+    });
 
     if (!crmRoutingReason || !crmRoutingReason.assignmentReason) return;
 

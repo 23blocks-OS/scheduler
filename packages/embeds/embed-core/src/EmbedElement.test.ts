@@ -78,6 +78,7 @@ function createTestEmbedElement(data: {
   element.innerHTML = inlineHTML({
     layout: dataset?.layout,
     pageType: dataset?.pageType as EmbedPageType | null,
+    externalThemeClass: dataset?.theme === "dark" ? EMBED_DARK_THEME_CLASS : EMBED_LIGHT_THEME_CLASS,
   });
 
   document.body.appendChild(element);
@@ -132,7 +133,6 @@ function mockGetComputedStyle() {
 
 describe("EmbedElement", () => {
   let element: EmbedElement;
-  let mockGetSkeletonData: Mock;
 
   beforeEach(() => {
     // Register the custom element
@@ -167,14 +167,14 @@ describe("EmbedElement", () => {
         expectDefaultLoader(element);
       });
 
-      it("should show default loader for when page type is not supported", () => {
+      it("should show skeleton loader for any non-empty page type (including unsupported ones)", () => {
         element = createTestEmbedElement({
           dataset: {
             pageType: "unknown",
           },
         });
 
-        expectDefaultLoader(element);
+        expectSkeletonLoader(element);
       });
 
       it("should hide skeleton loader when toggled off", () => {
@@ -222,7 +222,7 @@ describe("EmbedElement", () => {
         isModal = true;
       });
 
-      it("should show default loader for unsupported page types", () => {
+      it("should show default loader only when page type is not provided", () => {
         element = createTestEmbedElement({
           isModal,
         });

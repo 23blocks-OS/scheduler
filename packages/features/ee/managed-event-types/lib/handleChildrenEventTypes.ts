@@ -1,14 +1,13 @@
-import type { Prisma } from "@prisma/client";
-// eslint-disable-next-line no-restricted-imports
 import type { DeepMockProxy } from "vitest-mock-extended";
 
-import { sendSlugReplacementEmail } from "@calcom/emails/email-manager";
+import { eventTypeMetaDataSchemaWithTypedApps } from "@calcom/app-store/zod-utils";
+import { sendSlugReplacementEmail } from "@calcom/emails/integration-email-service";
 import { getTranslation } from "@calcom/lib/server/i18n";
 import type { PrismaClient } from "@calcom/prisma";
+import type { Prisma } from "@calcom/prisma/client";
 import { SchedulingType } from "@calcom/prisma/enums";
-import { _EventTypeModel } from "@calcom/prisma/zod";
-import { eventTypeMetaDataSchemaWithTypedApps } from "@calcom/prisma/zod-utils";
 import { allManagedEventTypeProps, unlockedManagedEventTypeProps } from "@calcom/prisma/zod-utils";
+import { EventTypeSchema } from "@calcom/prisma/zod/modelSchema/EventTypeSchema";
 
 interface handleChildrenEventTypesProps {
   eventTypeId: number;
@@ -93,7 +92,7 @@ export default async function handleChildrenEventTypes({
   children,
   prisma,
   profileId,
-  updatedValues,
+  updatedValues: _updatedValues,
 }: handleChildrenEventTypesProps) {
   // Check we are dealing with a managed event type
   if (updatedEventType?.schedulingType !== SchedulingType.MANAGED)
@@ -114,8 +113,8 @@ export default async function handleChildrenEventTypes({
     };
 
   // bookingFields is expected to be filled by the _EventTypeModel but is null at create event
-  const _ManagedEventTypeModel = _EventTypeModel.extend({
-    bookingFields: _EventTypeModel.shape.bookingFields.nullish(),
+  const _ManagedEventTypeModel = EventTypeSchema.extend({
+    bookingFields: EventTypeSchema.shape.bookingFields.nullish(),
   });
 
   const allManagedEventTypePropsZod = _ManagedEventTypeModel.pick(allManagedEventTypeProps);
@@ -155,47 +154,94 @@ export default async function handleChildrenEventTypes({
       userIds: newUserIds,
       teamName: oldEventType.team?.name ?? null,
     });
+
     // Create event types for new users added
-    await prisma.$transaction(
-      newUserIds.map((userId) => {
-        return prisma.eventType.create({
-          data: {
-            instantMeetingScheduleId: eventType.instantMeetingScheduleId ?? undefined,
-            profileId: profileId ?? null,
-            ...managedEventTypeValues,
-            ...unlockedEventTypeValues,
-            bookingLimits:
-              (managedEventTypeValues.bookingLimits as unknown as Prisma.InputJsonObject) ?? undefined,
-            recurringEvent:
-              (managedEventTypeValues.recurringEvent as unknown as Prisma.InputJsonValue) ?? undefined,
-            metadata: (managedEventTypeValues.metadata as Prisma.InputJsonValue) ?? undefined,
-            bookingFields: (managedEventTypeValues.bookingFields as Prisma.InputJsonValue) ?? undefined,
-            durationLimits: (managedEventTypeValues.durationLimits as Prisma.InputJsonValue) ?? undefined,
-            eventTypeColor: (managedEventTypeValues.eventTypeColor as Prisma.InputJsonValue) ?? undefined,
-            onlyShowFirstAvailableSlot: managedEventTypeValues.onlyShowFirstAvailableSlot ?? false,
-            userId,
-            users: {
-              connect: [{ id: userId }],
+    const eventTypesToCreateData = newUserIds.map((userId) => {
+      // Exclude profileId and instantMeetingScheduleId from managed values to avoid duplication
+      const {
+        profileId: _,
+        instantMeetingScheduleId: __,
+        ...managedValuesWithoutExplicit
+      } = managedEventTypeValues;
+
+      return {
+        instantMeetingScheduleId: eventType.instantMeetingScheduleId ?? undefined,
+        profileId: profileId ?? null,
+        ...managedValuesWithoutExplicit,
+        ...{
+          ...unlockedEventTypeValues,
+          // pre-genned as allowed null
+          locations: Array.isArray(unlockedEventTypeValues.locations)
+            ? unlockedEventTypeValues.locations
+            : undefined,
+        },
+        bookingLimits:
+          (managedEventTypeValues.bookingLimits as unknown as Prisma.InputJsonObject) ?? undefined,
+        recurringEvent:
+          (managedEventTypeValues.recurringEvent as unknown as Prisma.InputJsonValue) ?? undefined,
+        metadata: (managedEventTypeValues.metadata as Prisma.InputJsonValue) ?? undefined,
+        bookingFields: (managedEventTypeValues.bookingFields as Prisma.InputJsonValue) ?? undefined,
+        durationLimits: (managedEventTypeValues.durationLimits as Prisma.InputJsonValue) ?? undefined,
+        eventTypeColor: (managedEventTypeValues.eventTypeColor as Prisma.InputJsonValue) ?? undefined,
+        onlyShowFirstAvailableSlot: managedEventTypeValues.onlyShowFirstAvailableSlot ?? false,
+        userId,
+        parentId,
+        hidden: children?.find((ch) => ch.owner.id === userId)?.hidden ?? false,
+        /**
+         * RR Segment isn't applicable for managed event types.
+         */
+        rrSegmentQueryValue: undefined,
+        assignRRMembersUsingSegment: false,
+        useEventLevelSelectedCalendars: false,
+        restrictionScheduleId: null,
+        useBookerTimezone: false,
+        allowReschedulingCancelledBookings:
+          managedEventTypeValues.allowReschedulingCancelledBookings ?? false,
+      };
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.eventType.createMany({
+        data: eventTypesToCreateData,
+        skipDuplicates: true,
+      });
+
+      // Fetch the newly created event types to connect users and workflows
+      const createdEvents = await tx.eventType.findMany({
+        where: { parentId: parentId, userId: { in: newUserIds } },
+        select: { id: true, userId: true },
+      });
+
+      // Connect users to their event types (many-to-many relation)
+      // This is needed because createMany doesn't support nested relations
+      await Promise.all(
+        createdEvents.map((event) =>
+          tx.eventType.update({
+            where: { id: event.id },
+            data: {
+              users: {
+                connect: [{ id: event.userId! }],
+              },
             },
-            parentId,
-            hidden: children?.find((ch) => ch.owner.id === userId)?.hidden ?? false,
-            workflows: currentWorkflowIds && {
-              create: currentWorkflowIds.map((wfId) => ({ workflowId: wfId })),
-            },
-            /**
-             * RR Segment isn't applicable for managed event types.
-             */
-            rrSegmentQueryValue: undefined,
-            assignRRMembersUsingSegment: false,
-            useEventLevelSelectedCalendars: false,
-            restrictionScheduleId: null,
-            useBookerTimezone: false,
-            allowReschedulingCancelledBookings:
-              managedEventTypeValues.allowReschedulingCancelledBookings ?? false,
-          },
+          })
+        )
+      );
+
+      // Link workflows if any exist
+      if (currentWorkflowIds && currentWorkflowIds.length > 0) {
+        const workflowConnections = createdEvents.flatMap((event) =>
+          currentWorkflowIds.map((wfId) => ({
+            eventTypeId: event.id,
+            workflowId: wfId,
+          }))
+        );
+
+        await tx.workflowsOnEventTypes.createMany({
+          data: workflowConnections,
+          skipDuplicates: true,
         });
-      })
-    );
+      }
+    });
   }
 
   // Old users updated
@@ -209,7 +255,7 @@ export default async function handleChildrenEventTypes({
       teamName: oldEventType.team?.name || null,
     });
 
-    const { unlockedFields } = managedEventTypeValues.metadata?.managedEventConfig;
+    const { unlockedFields } = managedEventTypeValues.metadata?.managedEventConfig ?? {};
     const unlockedFieldProps = !unlockedFields
       ? {}
       : Object.keys(unlockedFields).reduce((acc, key) => {
@@ -257,7 +303,7 @@ export default async function handleChildrenEventTypes({
           data: {
             ...updatePayloadFiltered,
             hidden: children?.find((ch) => ch.owner.id === userId)?.hidden ?? false,
-            scheduleId: eventType.scheduleId || null,
+            ...("schedule" in unlockedFieldProps ? {} : { scheduleId: eventType.scheduleId || null }),
             restrictionScheduleId: null,
             useBookerTimezone: false,
             hashedLink:

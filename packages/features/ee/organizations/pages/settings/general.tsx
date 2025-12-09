@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
-import { checkAdminOrOwner } from "@calcom/features/auth/lib/checkAdminOrOwner";
 import { TimezoneSelect } from "@calcom/features/components/timezone-select";
+import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import SectionBottomActions from "@calcom/features/settings/SectionBottomActions";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { nameOfDay } from "@calcom/lib/weekday";
@@ -20,6 +20,7 @@ import { Select } from "@calcom/ui/components/form";
 import { SkeletonButton, SkeletonContainer, SkeletonText } from "@calcom/ui/components/skeleton";
 import { showToast } from "@calcom/ui/components/toast";
 
+import { DisableAutofillOnBookingPageSwitch } from "../components/DisableAutofillOnBookingPageSwitch";
 import { DisablePhoneOnlySMSNotificationsSwitch } from "../components/DisablePhoneOnlySMSNotificationsSwitch";
 import { LockEventTypeSwitch } from "../components/LockEventTypeSwitch";
 import { NoSlotsNotificationSwitch } from "../components/NoSlotsNotificationSwitch";
@@ -27,7 +28,7 @@ import { NoSlotsNotificationSwitch } from "../components/NoSlotsNotificationSwit
 const SkeletonLoader = () => {
   return (
     <SkeletonContainer>
-      <div className="mb-8 mt-6 space-y-6">
+      <div className="mb-8 mt-6 stack-y-6">
         <SkeletonText className="h-8 w-full" />
         <SkeletonText className="h-8 w-full" />
         <SkeletonText className="h-8 w-full" />
@@ -41,22 +42,31 @@ const SkeletonLoader = () => {
 
 interface GeneralViewProps {
   currentOrg: RouterOutputs["viewer"]["organizations"]["listCurrent"];
-  isAdminOrOwner: boolean;
   localeProp: string;
+
+  permissions: {
+    canRead: boolean;
+    canEdit: boolean;
+  };
 }
 
-const OrgGeneralView = () => {
+const OrgGeneralView = ({
+  permissions,
+}: {
+  permissions: {
+    canRead: boolean;
+    canEdit: boolean;
+  };
+}) => {
   const { t } = useLocale();
   const router = useRouter();
   const session = useSession();
-  const isAdminOrOwner = checkAdminOrOwner(session.data?.user?.org?.role);
 
   const {
     data: currentOrg,
     isPending,
     error,
   } = trpc.viewer.organizations.listCurrent.useQuery(undefined, {});
-  const { data: user } = trpc.viewer.me.get.useQuery();
 
   useEffect(
     function refactorMeWithoutEffect() {
@@ -73,21 +83,26 @@ const OrgGeneralView = () => {
   }
 
   return (
-    <>
+    <LicenseRequired>
       <GeneralView
         currentOrg={currentOrg}
-        isAdminOrOwner={isAdminOrOwner}
-        localeProp={user?.locale ?? "en"}
+        localeProp={session.data?.user.locale ?? "en"}
+        permissions={permissions}
       />
 
-      <LockEventTypeSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
-      <NoSlotsNotificationSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
-      <DisablePhoneOnlySMSNotificationsSwitch currentOrg={currentOrg} isAdminOrOwner={!!isAdminOrOwner} />
-    </>
+      {permissions.canEdit && (
+        <>
+          <LockEventTypeSwitch currentOrg={currentOrg} />
+          <NoSlotsNotificationSwitch currentOrg={currentOrg} />
+          <DisablePhoneOnlySMSNotificationsSwitch currentOrg={currentOrg} />
+          <DisableAutofillOnBookingPageSwitch currentOrg={currentOrg} />
+        </>
+      )}
+    </LicenseRequired>
   );
 };
 
-const GeneralView = ({ currentOrg, isAdminOrOwner, localeProp }: GeneralViewProps) => {
+const GeneralView = ({ currentOrg, permissions, localeProp }: GeneralViewProps) => {
   const { t } = useLocale();
 
   const mutation = trpc.viewer.organizations.update.useMutation({
@@ -135,7 +150,7 @@ const GeneralView = ({ currentOrg, isAdminOrOwner, localeProp }: GeneralViewProp
     reset,
     getValues,
   } = formMethods;
-  const isDisabled = isSubmitting || !isDirty || !isAdminOrOwner;
+  const isDisabled = isSubmitting || !isDirty || !permissions.canEdit;
   return (
     <Form
       form={formMethods}
@@ -149,7 +164,7 @@ const GeneralView = ({ currentOrg, isAdminOrOwner, localeProp }: GeneralViewProp
       <div
         className={classNames(
           "border-subtle border-x border-y-0 px-4 py-8 sm:px-6",
-          !isAdminOrOwner && "rounded-b-lg border-y"
+          !permissions.canEdit && "rounded-b-lg border-y"
         )}>
         <Controller
           name="timeZone"
@@ -210,7 +225,7 @@ const GeneralView = ({ currentOrg, isAdminOrOwner, localeProp }: GeneralViewProp
         />
       </div>
 
-      {isAdminOrOwner && (
+      {permissions?.canEdit && (
         <SectionBottomActions align="end">
           <Button disabled={isDisabled} color="primary" type="submit">
             {t("update")}

@@ -1,9 +1,9 @@
-import type { Prisma } from "@prisma/client";
 import z from "zod";
 
-import { getBookerBaseUrlSync } from "@calcom/lib/getBookerUrl/client";
-import { UserRepository } from "@calcom/lib/server/repository/user";
+import { getBookerBaseUrlSync } from "@calcom/features/ee/organizations/lib/getBookerBaseUrlSync";
+import { UserRepository } from "@calcom/features/users/repositories/UserRepository";
 import { prisma } from "@calcom/prisma";
+import type { Prisma } from "@calcom/prisma/client";
 
 import { TRPCError } from "@trpc/server";
 
@@ -104,13 +104,23 @@ export const listOtherTeamMembers = async ({ input }: ListOptions) => {
     nextCursor = nextItem?.id || null;
   }
 
+  const users = members.map((membership) => membership.user);
+  const enrichedUsers = await new UserRepository(prisma).enrichUsersWithTheirProfileExcludingOrgMetadata(
+    users
+  );
+
+  const enrichedUserMap = new Map<number, (typeof enrichedUsers)[0]>();
+  enrichedUsers.forEach((enrichedUser) => {
+    enrichedUserMap.set(enrichedUser.id, enrichedUser);
+  });
+
   const enrichedMemberships = [];
   for (const membership of members) {
+    const enrichedUser = enrichedUserMap.get(membership.user.id);
+    if (!enrichedUser) continue;
     enrichedMemberships.push({
       ...membership,
-      user: await UserRepository.enrichUserWithItsProfile({
-        user: membership.user,
-      }),
+      user: enrichedUser,
     });
   }
   return {
