@@ -19,7 +19,6 @@ import { AnimatedPopover } from "@calcom/ui/components/popover";
 import { FilterResults } from "../../../filters/components/FilterResults";
 import { TeamsFilter } from "../../../filters/components/TeamsFilter";
 import { getTeamsFiltersFromQuery } from "../../../filters/lib/getTeamsFiltersFromQuery";
-import LicenseRequired from "../../common/components/LicenseRequired";
 import EmptyScreen from "../components/EmptyScreen";
 import SkeletonLoader from "../components/SkeletonLoaderList";
 import { WorkflowCreationDialog, useWorkflowCreation } from "../components/WorkflowCreationDialog";
@@ -50,7 +49,7 @@ function WorkflowsPage({ filteredList }: PageProps) {
 
   return (
     <Shell withoutMain>
-      <LicenseRequired>
+      <>
         <ShellMain
           heading={t("workflows")}
           subtitle={t("workflows_to_automate_notifications")}
@@ -100,7 +99,7 @@ function WorkflowsPage({ filteredList }: PageProps) {
           </>
         </ShellMain>
         <WorkflowCreationDialog open={showDialog} onOpenChange={setShowDialog} teamId={pendingTeamId} />
-      </LicenseRequired>
+      </>
     </Shell>
   );
 }

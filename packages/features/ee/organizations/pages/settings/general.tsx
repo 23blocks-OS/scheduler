@@ -6,7 +6,6 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { TimezoneSelect } from "@calcom/features/components/timezone-select";
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import SectionBottomActions from "@calcom/features/settings/SectionBottomActions";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { nameOfDay } from "@calcom/lib/weekday";
@@ -83,7 +82,7 @@ const OrgGeneralView = ({
   }
 
   return (
-    <LicenseRequired>
+    <>
       <GeneralView
         currentOrg={currentOrg}
         localeProp={session.data?.user.locale ?? "en"}
@@ -98,7 +97,7 @@ const OrgGeneralView = ({
           <DisableAutofillOnBookingPageSwitch currentOrg={currentOrg} />
         </>
       )}
-    </LicenseRequired>
+    </>
   );
 };
 

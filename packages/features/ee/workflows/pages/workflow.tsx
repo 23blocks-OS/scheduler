@@ -27,7 +27,6 @@ import { Icon } from "@calcom/ui/components/icon";
 import { showToast } from "@calcom/ui/components/toast";
 import { Tooltip } from "@calcom/ui/components/tooltip";
 
-import LicenseRequired from "../../common/components/LicenseRequired";
 import { DeleteDialog } from "../components/DeleteDialog";
 import SkeletonLoader from "../components/SkeletonLoaderEdit";
 import WorkflowDetailsPage from "../components/WorkflowDetailsPage";
@@ -438,7 +437,7 @@ function WorkflowPage({
   };
 
   return session.data ? (
-    <LicenseRequired>
+    <>
       <Form
         form={form}
         handleSubmit={async (values) => {
@@ -573,7 +572,7 @@ function WorkflowPage({
         }}
       />
       <Toaster position="bottom-right" />
-    </LicenseRequired>
+    </>
   ) : (
     <></>
   );
