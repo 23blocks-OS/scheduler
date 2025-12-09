@@ -2,8 +2,8 @@
 
 # Version and tagging
 VERSION_MAJOR ?= 0
-VERSION_MINOR ?= 0
-VERSION_PATCH ?= 5
+VERSION_MINOR ?= 1
+VERSION_PATCH ?= 0
 VERSION ?= v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
 
 # Registry configuration
@@ -80,7 +80,7 @@ staging-build:
 	@echo "Build Date: $(BUILD_DATE)"
 	docker build \
 		$(DOCKER_BUILD_ARGS) \
-		-f dockerfile \
+		-f Dockerfile \
 		-t $(IMAGE_NAME):staging \
 		-t $(IMAGE_NAME):$(VERSION) \
 		.
@@ -119,7 +119,7 @@ prod-build:
 	@echo "Build Date: $(BUILD_DATE)"
 	docker build \
 		$(DOCKER_BUILD_ARGS) \
-		-f dockerfile \
+		-f Dockerfile \
 		-t $(IMAGE_NAME):production \
 		-t $(IMAGE_NAME):$(VERSION)-prod \
 		.
@@ -155,7 +155,7 @@ local-build:
 	@echo "Building scheduler image locally..."
 	docker build \
 		$(DOCKER_BUILD_ARGS) \
-		-f dockerfile \
+		-f Dockerfile \
 		-t $(IMAGE_NAME):local \
 		.
 
