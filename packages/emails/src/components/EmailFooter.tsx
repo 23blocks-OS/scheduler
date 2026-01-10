@@ -1,11 +1,17 @@
-import { COMPANY_LOGO_URL, WEBAPP_URL } from "@calcom/lib/constants";
+import { COMPANY_LOGO_URL, SOURCE_CODE_URL, WEBAPP_URL } from "@calcom/lib/constants";
 
 import RawHtml from "./RawHtml";
 import Row from "./Row";
 
-const CommentIE = ({ html = "" }) => <RawHtml html={`<!--[if mso | IE]>${html}<![endif]-->`} />;
+const CommentIE = ({ html = "" }: { html?: string }) => (
+  <RawHtml html={`<!--[if mso | IE]>${html}<![endif]-->`} />
+);
 
-const EmailBodyLogo = () => {
+interface EmailFooterProps {
+  isWhiteLabeled?: boolean;
+}
+
+const EmailFooter = ({ isWhiteLabeled = false }: EmailFooterProps) => {
   const image = COMPANY_LOGO_URL;
 
   return (
@@ -67,6 +73,40 @@ const EmailBodyLogo = () => {
                   </Row>
                 </td>
               </Row>
+              {/* Source code attribution for license compliance */}
+              {isWhiteLabeled && (
+                <Row border="0" style={{ verticalAlign: "top" }} width="100%">
+                  <td
+                    align="center"
+                    style={{
+                      fontSize: "0px",
+                      padding: "8px 25px",
+                      paddingBottom: "24px",
+                      wordBreak: "break-word",
+                    }}>
+                    <div
+                      style={{
+                        fontFamily: "Roboto, Helvetica, sans-serif",
+                        fontSize: "11px",
+                        lineHeight: "16px",
+                        textAlign: "center",
+                        color: "#6B7280",
+                      }}>
+                      Powered by{" "}
+                      <a
+                        href={SOURCE_CODE_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "#6B7280",
+                          textDecoration: "underline",
+                        }}>
+                        open source scheduling software
+                      </a>
+                    </div>
+                  </td>
+                </Row>
+              )}
             </div>
             <CommentIE html="</td></tr></table>" />
           </td>
@@ -76,4 +116,4 @@ const EmailBodyLogo = () => {
   );
 };
 
-export default EmailBodyLogo;
+export default EmailFooter;

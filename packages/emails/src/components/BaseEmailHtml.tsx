@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-head-element */
 import BaseTable from "./BaseTable";
 import EmailBodyLogo from "./EmailBodyLogo";
+import EmailFooter from "./EmailFooter";
 import EmailHead from "./EmailHead";
 import EmailScheduledBodyHeaderContent from "./EmailScheduledBodyHeaderContent";
 import EmailSchedulingBodyDivider from "./EmailSchedulingBodyDivider";
@@ -24,6 +25,7 @@ export const BaseEmailHtml = (props: {
   subtitle?: React.ReactNode | string;
   headerType?: BodyHeadType;
   hideLogo?: boolean;
+  isWhiteLabeled?: boolean;
 }) => {
   return (
     <Html>
@@ -197,7 +199,13 @@ export const BaseEmailHtml = (props: {
               </Row>
             </div>
           </div>
-          {!Boolean(props.hideLogo) && <EmailBodyLogo />}
+          {!Boolean(props.hideLogo) && (
+            props.isWhiteLabeled ? (
+              <EmailFooter isWhiteLabeled={true} />
+            ) : (
+              <EmailBodyLogo />
+            )
+          )}
           <RawHtml html="<!--[if mso | IE]></td></tr></table><![endif]-->" />
         </div>
       </body>

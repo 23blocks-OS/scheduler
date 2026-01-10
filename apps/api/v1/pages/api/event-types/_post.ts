@@ -297,7 +297,14 @@ async function postHandler(req: NextApiRequest) {
   }
 
   if (isSystemWideAdmin && userId && parsedBody.teamId === undefined) {
-    data = { ...parsedBody, users: { connect: { id: userId } } };
+    data = {
+      ...parsedBody,
+      userId: userId,
+      users: { connect: { id: userId } },
+      bookingLimits: bookingLimits === null ? Prisma.DbNull : bookingLimits,
+      durationLimits: durationLimits === null ? Prisma.DbNull : durationLimits,
+      locations: locations === null ? Prisma.DbNull : locations,
+    };
   }
 
   await checkTeamEventEditPermission(req, parsedBody);

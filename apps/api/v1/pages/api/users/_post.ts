@@ -65,6 +65,9 @@ import { schemaUserCreateBodyParams } from "~/lib/validations/user";
  *               avatar:
  *                 description: The user's avatar, in base64 format
  *                 type: string
+ *               emailVerified:
+ *                 description: Set to true to mark the user's email as verified (skips confirmation email)
+ *                 type: boolean
  *           examples:
  *              user:
  *                summary: An example of USER
@@ -92,9 +95,14 @@ async function postHandler(req: NextApiRequest) {
   const { isSystemWideAdmin } = req;
   // If user is not ADMIN, return unauthorized.
   if (!isSystemWideAdmin) throw new HttpError({ statusCode: 401, message: "You are not authorized" });
-  const data = await schemaUserCreateBodyParams.parseAsync(req.body);
+  const { emailVerified, ...data } = await schemaUserCreateBodyParams.parseAsync(req.body);
   const user = await UserCreationService.createUser({
-    data: { ...data, creationSource: CreationSource.API_V1 },
+    data: {
+      ...data,
+      creationSource: CreationSource.API_V1,
+      // Convert boolean emailVerified to Date for UserCreationService
+      ...(emailVerified && { emailVerified: new Date() }),
+    },
   });
   req.statusCode = 201;
   return { user };

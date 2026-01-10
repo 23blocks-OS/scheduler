@@ -31,6 +31,10 @@ export const SENDER_ID = process.env.NEXT_PUBLIC_SENDER_ID || "Cal";
 export const SENDER_NAME = process.env.NEXT_PUBLIC_SENDGRID_SENDER_NAME || "Cal.com";
 export const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || APP_NAME;
 
+// White-label configuration
+export const COMPANY_LOGO_URL = process.env.NEXT_PUBLIC_COMPANY_LOGO_URL || `${WEBAPP_URL}/emails/logo.png`;
+export const SOURCE_CODE_URL = "https://github.com/calcom/cal.com";
+
 // This is the URL from which all Cal Links and their assets are served.
 // Use website URL to make links shorter(cal.com and not app.cal.com)
 // As website isn't setup for preview environments, use the webapp url instead

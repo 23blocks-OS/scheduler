@@ -135,6 +135,8 @@ const schemaUserCreateParams = z.object({
   locale: z.nativeEnum(locales).optional(),
   createdDate: iso8601.optional(),
   avatar: z.string().refine(isValidBase64Image).optional(),
+  // When true, marks the user's email as verified (skips confirmation email)
+  emailVerified: z.boolean().optional(),
 });
 
 // @note: These are the values that are editable via PATCH method on the user Model,
