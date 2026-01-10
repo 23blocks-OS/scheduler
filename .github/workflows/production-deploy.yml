@@ -1,0 +1,156 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v0.2.0)'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: 23blocks/scheduler
+  STAGING_ECR_REGISTRY: 663969591440.dkr.ecr.us-east-2.amazonaws.com
+  PROD_ECR_REGISTRY: 052378748364.dkr.ecr.us-east-2.amazonaws.com
+
+jobs:
+  # Validate version exists in staging
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # Ensure version starts with 'v'
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Version must be in format v0.0.0"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version validated: $VERSION"
+
+      - name: Configure AWS credentials (staging)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to staging ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Verify image exists in staging
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # Check if the image exists in staging ECR
+          if ! docker manifest inspect ${{ env.STAGING_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION > /dev/null 2>&1; then
+            echo "Error: Image $VERSION not found in staging ECR"
+            echo "Please ensure the version has been deployed to staging first"
+            exit 1
+          fi
+
+          echo "Image verified in staging: ${{ env.STAGING_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION"
+
+  # Manual approval gate via GitHub Environment
+  approve:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Approval received
+        run: |
+          echo "Production deployment approved for version: ${{ needs.validate.outputs.version }}"
+
+  # Promote image from staging to production
+  promote:
+    needs: [validate, approve]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials (staging - pull)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to staging ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull image from staging
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          echo "Pulling image from staging ECR..."
+          docker pull ${{ env.STAGING_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION
+
+          echo "Image pulled successfully"
+
+      - name: Configure AWS credentials (production - push)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to production ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push to production
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          STAGING_IMAGE="${{ env.STAGING_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION"
+          PROD_IMAGE_VERSION="${{ env.PROD_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION"
+          PROD_IMAGE_LATEST="${{ env.PROD_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
+
+          echo "Tagging image for production..."
+          docker tag $STAGING_IMAGE $PROD_IMAGE_VERSION
+          docker tag $STAGING_IMAGE $PROD_IMAGE_LATEST
+
+          echo "Pushing to production ECR..."
+          docker push $PROD_IMAGE_VERSION
+          docker push $PROD_IMAGE_LATEST
+
+          echo "Production deployment complete!"
+
+      - name: Output deployment summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          echo "## Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Images pushed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.PROD_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.PROD_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Promoted from staging:** \`${{ env.STAGING_ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$VERSION\`" >> $GITHUB_STEP_SUMMARY
+
+  # Notify on completion
+  notify:
+    needs: [validate, promote]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify success
+        if: needs.promote.result == 'success'
+        run: |
+          echo "Production deployment completed successfully!"
+          echo "Version: ${{ needs.validate.outputs.version }}"
+
+      - name: Notify failure
+        if: needs.promote.result == 'failure'
+        run: |
+          echo "Production deployment failed!"
+          exit 1

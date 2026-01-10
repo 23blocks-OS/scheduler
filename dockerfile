@@ -13,6 +13,13 @@ ARG MAX_OLD_SPACE_SIZE=12288
 ARG NEXT_PUBLIC_API_V2_URL
 ARG NEXT_PUBLIC_API_V2_ROOT_URL
 
+# Version build arguments (populated by CI/CD)
+ARG VERSION_MAJOR=0
+ARG VERSION_MINOR=1
+ARG VERSION_PATCH=0
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 ENV NEXT_PUBLIC_WEBAPP_URL=http://NEXT_PUBLIC_WEBAPP_URL_PLACEHOLDER \
     NEXT_PUBLIC_API_V2_URL=${NEXT_PUBLIC_API_V2_URL:-http://NEXT_PUBLIC_WEBAPP_URL_PLACEHOLDER/api/v2} \
     NEXT_PUBLIC_API_V2_ROOT_URL=${NEXT_PUBLIC_API_V2_ROOT_URL:-http://localhost:3004} \
@@ -33,6 +40,10 @@ COPY apps/web ./apps/web
 COPY apps/api ./apps/api
 COPY packages ./packages
 COPY tests ./tests
+COPY config ./config
+
+# Generate version.json with build-time values
+RUN echo "{\"major\":${VERSION_MAJOR},\"minor\":${VERSION_MINOR},\"patch\":${VERSION_PATCH},\"build\":\"${GIT_COMMIT}\",\"buildDate\":\"${BUILD_DATE}\"}" > config/version.json
 
 RUN yarn config set httpTimeout 1200000
 RUN npx turbo prune --scope=@calcom/web --scope=@calcom/api --docker

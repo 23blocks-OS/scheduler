@@ -1,0 +1,253 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: 23blocks/scheduler
+  STAGING_ECR_REGISTRY: 663969591440.dkr.ecr.us-east-2.amazonaws.com
+
+jobs:
+  # Run type checking before deployment
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Run type check
+        run: yarn type-check
+        continue-on-error: true  # Don't block deployment for type errors (Cal.com upstream has some)
+
+  # Calculate semantic version from conventional commits
+  version:
+    needs: type-check
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      version_major: ${{ steps.version.outputs.major }}
+      version_minor: ${{ steps.version.outputs.minor }}
+      version_patch: ${{ steps.version.outputs.patch }}
+      should_deploy: ${{ steps.version.outputs.should_deploy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for version calculation
+
+      - name: Get latest tag
+        id: get-latest
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          # Parse version components
+          VERSION=${LATEST_TAG#v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+
+          echo "current_major=${MAJOR:-0}" >> $GITHUB_OUTPUT
+          echo "current_minor=${MINOR:-0}" >> $GITHUB_OUTPUT
+          echo "current_patch=${PATCH:-0}" >> $GITHUB_OUTPUT
+
+          echo "Latest tag: $LATEST_TAG"
+          echo "Current version: $MAJOR.$MINOR.$PATCH"
+
+      - name: Analyze commits for version bump
+        id: analyze
+        env:
+          LATEST_TAG: ${{ steps.get-latest.outputs.latest_tag }}
+        run: |
+          # Get commits since last tag
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"%s" HEAD 2>/dev/null || echo "")
+          else
+            COMMITS=$(git log --pretty=format:"%s" $LATEST_TAG..HEAD 2>/dev/null || echo "")
+          fi
+
+          echo "Commits since $LATEST_TAG:"
+          echo "$COMMITS"
+
+          # Determine bump type from conventional commits
+          BUMP_TYPE="patch"
+
+          # Check for breaking changes (MAJOR)
+          if echo "$COMMITS" | grep -qiE "^(feat|fix|refactor|perf|chore|docs|style|test|build|ci)(\(.+\))?!:|BREAKING CHANGE:"; then
+            BUMP_TYPE="major"
+          # Check for new features (MINOR)
+          elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
+            BUMP_TYPE="minor"
+          fi
+
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Bump type: $BUMP_TYPE"
+
+          # Check if there are any commits to deploy
+          if [ -z "$COMMITS" ]; then
+            echo "has_commits=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_commits=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Calculate new version
+        id: version
+        env:
+          CURRENT_MAJOR: ${{ steps.get-latest.outputs.current_major }}
+          CURRENT_MINOR: ${{ steps.get-latest.outputs.current_minor }}
+          CURRENT_PATCH: ${{ steps.get-latest.outputs.current_patch }}
+          BUMP_TYPE: ${{ steps.analyze.outputs.bump_type }}
+          HAS_COMMITS: ${{ steps.analyze.outputs.has_commits }}
+        run: |
+          # Skip if no new commits
+          if [ "$HAS_COMMITS" = "false" ]; then
+            echo "No new commits since last tag, skipping version bump"
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "new_version=v$CURRENT_MAJOR.$CURRENT_MINOR.$CURRENT_PATCH" >> $GITHUB_OUTPUT
+            echo "major=$CURRENT_MAJOR" >> $GITHUB_OUTPUT
+            echo "minor=$CURRENT_MINOR" >> $GITHUB_OUTPUT
+            echo "patch=$CURRENT_PATCH" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Calculate new version
+          case $BUMP_TYPE in
+            major)
+              NEW_MAJOR=$((CURRENT_MAJOR + 1))
+              NEW_MINOR=0
+              NEW_PATCH=0
+              ;;
+            minor)
+              NEW_MAJOR=$CURRENT_MAJOR
+              NEW_MINOR=$((CURRENT_MINOR + 1))
+              NEW_PATCH=0
+              ;;
+            patch)
+              NEW_MAJOR=$CURRENT_MAJOR
+              NEW_MINOR=$CURRENT_MINOR
+              NEW_PATCH=$((CURRENT_PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "major=$NEW_MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$NEW_MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$NEW_PATCH" >> $GITHUB_OUTPUT
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+
+          echo "New version: $NEW_VERSION"
+
+      - name: Create and push tag
+        if: steps.version.outputs.should_deploy == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a $NEW_VERSION -m "Release $NEW_VERSION"
+          git push origin $NEW_VERSION
+
+          echo "Created and pushed tag: $NEW_VERSION"
+
+  # Build and push Docker image to staging ECR
+  build-and-push:
+    needs: version
+    if: needs.version.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU for ARM64 builds
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ env.STAGING_ECR_REGISTRY }}
+          IMAGE_TAG: ${{ needs.version.outputs.new_version }}
+          VERSION_MAJOR: ${{ needs.version.outputs.version_major }}
+          VERSION_MINOR: ${{ needs.version.outputs.version_minor }}
+          VERSION_PATCH: ${{ needs.version.outputs.version_patch }}
+        run: |
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          GIT_COMMIT=${{ github.sha }}
+
+          echo "Building image with version: $IMAGE_TAG"
+          echo "Version components: $VERSION_MAJOR.$VERSION_MINOR.$VERSION_PATCH"
+          echo "Build date: $BUILD_DATE"
+          echo "Git commit: $GIT_COMMIT"
+
+          docker buildx build \
+            --platform linux/arm64 \
+            --build-arg VERSION_MAJOR=$VERSION_MAJOR \
+            --build-arg VERSION_MINOR=$VERSION_MINOR \
+            --build-arg VERSION_PATCH=$VERSION_PATCH \
+            --build-arg GIT_COMMIT=$GIT_COMMIT \
+            --build-arg BUILD_DATE=$BUILD_DATE \
+            --build-arg CALCOM_TELEMETRY_DISABLED=1 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --push \
+            .
+
+      - name: Output image details
+        env:
+          ECR_REGISTRY: ${{ env.STAGING_ECR_REGISTRY }}
+          IMAGE_TAG: ${{ needs.version.outputs.new_version }}
+        run: |
+          echo "## Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "**Images pushed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$ECR_REGISTRY/$ECR_REPOSITORY:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** linux/arm64 (Graviton)" >> $GITHUB_STEP_SUMMARY
+
+  # Notify on completion
+  notify:
+    needs: [version, build-and-push]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify success
+        if: needs.build-and-push.result == 'success'
+        run: |
+          echo "Deployment to staging completed successfully!"
+          echo "Version: ${{ needs.version.outputs.new_version }}"
+
+      - name: Notify failure
+        if: needs.build-and-push.result == 'failure'
+        run: |
+          echo "Deployment to staging failed!"
+          exit 1
