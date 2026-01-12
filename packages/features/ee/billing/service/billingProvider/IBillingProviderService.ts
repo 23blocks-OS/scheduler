@@ -24,6 +24,15 @@ export interface IBillingProviderService {
     metadata?: Record<string, string | number>;
   }): Promise<{ id: string; client_secret: string | null }>;
 
+  // One-time checkout
+  createOneTimeCheckout(args: {
+    priceId: string;
+    quantity: number;
+    successUrl: string;
+    cancelUrl: string;
+    metadata?: Record<string, string>;
+  }): Promise<{ checkoutUrl: string | null; sessionId: string }>;
+
   // Subscription management
   createSubscriptionCheckout(args: {
     customerId: string;
@@ -65,4 +74,15 @@ export interface IBillingProviderService {
   getCustomer(customerId: string): Promise<Stripe.Customer | Stripe.DeletedCustomer | null>;
   getSubscriptions(customerId: string): Promise<Stripe.Subscription[] | null>;
   updateCustomer(args: { customerId: string; email: string; userId?: number }): Promise<void>;
+
+  // Subscription date extraction
+  extractSubscriptionDates(subscription: {
+    start_date: number;
+    trial_end?: number | null;
+    cancel_at?: number | null;
+  }): {
+    subscriptionStart: Date;
+    subscriptionTrialEnd: Date | null;
+    subscriptionEnd: Date | null;
+  };
 }

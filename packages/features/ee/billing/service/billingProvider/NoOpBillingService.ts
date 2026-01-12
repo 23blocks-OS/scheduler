@@ -55,6 +55,17 @@ export class NoOpBillingService implements IBillingProviderService {
     return { id: "", client_secret: null };
   }
 
+  async createOneTimeCheckout(_args: {
+    priceId: string;
+    quantity: number;
+    successUrl: string;
+    cancelUrl: string;
+    metadata?: Record<string, string>;
+  }): Promise<{ checkoutUrl: string | null; sessionId: string }> {
+    this.logDisabled("createOneTimeCheckout");
+    return { checkoutUrl: null, sessionId: "" };
+  }
+
   async createSubscriptionCheckout(_args: {
     customerId: string;
     successUrl: string;
@@ -121,5 +132,22 @@ export class NoOpBillingService implements IBillingProviderService {
 
   async updateCustomer(_args: { customerId: string; email: string; userId?: number }): Promise<void> {
     this.logDisabled("updateCustomer");
+  }
+
+  extractSubscriptionDates(_subscription: {
+    start_date: number;
+    trial_end?: number | null;
+    cancel_at?: number | null;
+  }): {
+    subscriptionStart: Date;
+    subscriptionTrialEnd: Date | null;
+    subscriptionEnd: Date | null;
+  } {
+    this.logDisabled("extractSubscriptionDates");
+    return {
+      subscriptionStart: new Date(),
+      subscriptionTrialEnd: null,
+      subscriptionEnd: null,
+    };
   }
 }
