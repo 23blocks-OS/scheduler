@@ -39,7 +39,15 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
               target="_blank"
               rel="noopener noreferrer"
               className="text-subtle hover:text-default hover:underline">
-              open source scheduling software
+              Cal.com
+            </a>
+            {" · "}
+            <a
+              href={`${SOURCE_CODE_URL}/blob/main/LICENSE`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-subtle hover:text-default hover:underline">
+              AGPLv3 License
             </a>
           </p>
         </div>
