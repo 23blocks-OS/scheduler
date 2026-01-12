@@ -33,7 +33,7 @@ export const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || APP_NAME;
 
 // White-label configuration
 export const COMPANY_LOGO_URL = process.env.NEXT_PUBLIC_COMPANY_LOGO_URL || `${WEBAPP_URL}/emails/logo.png`;
-export const SOURCE_CODE_URL = "https://github.com/calcom/cal.com";
+export const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL || "https://github.com/calcom/cal.com";
 
 // This is the URL from which all Cal Links and their assets are served.
 // Use website URL to make links shorter(cal.com and not app.cal.com)
@@ -91,8 +91,9 @@ export const PUBLIC_QUICK_AVAILABILITY_ROLLOUT =
 
 /** @deprecated use `WEBAPP_URL` */
 export const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_WEBAPP_URL || `https://${process.env.VERCEL_URL}`;
-export const LOGO = "/calcom-logo-white-word.svg";
-export const LOGO_ICON = "/cal-com-icon-white.svg";
+// Logo configuration (white-label)
+export const LOGO = process.env.NEXT_PUBLIC_LOGO_URL || "/calcom-logo-white-word.svg";
+export const LOGO_ICON = process.env.NEXT_PUBLIC_LOGO_ICON_URL || "/cal-com-icon-white.svg";
 export const AVATAR_FALLBACK = "/avatar.svg";
 export const FAVICON_16 = "/favicon-16x16.png";
 export const FAVICON_32 = "/favicon-32x32.png";

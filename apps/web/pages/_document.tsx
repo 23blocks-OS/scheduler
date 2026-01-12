@@ -54,7 +54,7 @@ class MyDocument extends Document<Props> {
         <Head>
           <script
             id="newLocale"
-            // eslint-disable-next-line react/no-danger
+             
             dangerouslySetInnerHTML={{
               __html: `
               window.calNewLocale = "${newLocale}";
@@ -67,7 +67,7 @@ class MyDocument extends Document<Props> {
           <link rel="apple-touch-icon" sizes="180x180" href="/api/logo?type=apple-touch-icon" />
           <link rel="icon" type="image/png" sizes="32x32" href="/api/logo?type=favicon-32" />
           <link rel="icon" type="image/png" sizes="16x16" href="/api/logo?type=favicon-16" />
-          <link rel="manifest" href="/site.webmanifest" />
+          <link rel="manifest" href="/manifest.webmanifest" />
           <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#000000" />
           <meta name="msapplication-TileColor" content="#ff0000" />
           <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F9FAFC" />

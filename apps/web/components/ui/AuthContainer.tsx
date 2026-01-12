@@ -1,5 +1,6 @@
 import classNames from "classnames";
 
+import { SOURCE_CODE_URL } from "@calcom/lib/constants";
 import { Logo } from "@calcom/ui/components/logo";
 
 import Loader from "@components/Loader";
@@ -29,6 +30,19 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
           {props.children}
         </div>
         <div className="text-default mt-8 text-center text-sm">{props.footerText}</div>
+        {/* License attribution for AGPLv3 compliance */}
+        <div className="mt-4 text-center">
+          <p className="text-subtle text-xs">
+            Powered by{" "}
+            <a
+              href={SOURCE_CODE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-subtle hover:text-default hover:underline">
+              open source scheduling software
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

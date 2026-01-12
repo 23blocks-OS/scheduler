@@ -64,13 +64,13 @@ export const metadata = {
       },
     ],
   },
-  manifest: "/site.webmanifest",
+  manifest: "/manifest.webmanifest",
   other: {
     "application-TileColor": "#ff0000",
   },
   twitter: {
-    site: "@calcom",
-    creator: "@calcom",
+    site: process.env.NEXT_PUBLIC_TWITTER_HANDLE || "@calcom",
+    creator: process.env.NEXT_PUBLIC_TWITTER_HANDLE || "@calcom",
     card: "summary_large_image",
   },
   robots: {
@@ -117,8 +117,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head nonce={nonce}>
         <style>{`
           :root {
-            --font-sans: ${interFont.style.fontFamily.replace(/\'/g, "")};
-            --font-cal: ${calFont.style.fontFamily.replace(/\'/g, "")};
+            --font-sans: ${interFont.style.fontFamily.replace(/'/g, "")};
+            --font-cal: ${calFont.style.fontFamily.replace(/'/g, "")};
           }
         `}</style>
       </head>

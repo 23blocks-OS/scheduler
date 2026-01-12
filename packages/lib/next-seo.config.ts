@@ -24,6 +24,9 @@ export const getSeoImage = (key: keyof typeof seoImages): string => {
   return seoImages[key];
 };
 
+// Twitter handle is configurable for white-labeling
+const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE || "@calcom";
+
 export const seoConfig: {
   headSeo: Required<Pick<HeadSeoProps, "siteName">>;
   defaultNextSeo: DefaultSeoProps;
@@ -33,8 +36,8 @@ export const seoConfig: {
   },
   defaultNextSeo: {
     twitter: {
-      handle: "@calcom",
-      site: "@calcom",
+      handle: TWITTER_HANDLE,
+      site: TWITTER_HANDLE,
       cardType: "summary_large_image",
     },
   },
