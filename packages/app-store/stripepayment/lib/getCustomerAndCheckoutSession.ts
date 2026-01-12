@@ -3,6 +3,11 @@ import { getBillingProviderService } from "@calcom/features/ee/billing/di/contai
 export async function getCustomerAndCheckoutSession(checkoutSessionId: string) {
   const billingService = getBillingProviderService();
   const checkoutSession = await billingService.getCheckoutSession(checkoutSessionId);
+
+  if (!checkoutSession) {
+    return { checkoutSession: null, stripeCustomer: null };
+  }
+
   const customerOrCustomerId = checkoutSession.customer;
   let customerId = null;
 
@@ -18,7 +23,7 @@ export async function getCustomerAndCheckoutSession(checkoutSessionId: string) {
     customerId = customerOrCustomerId.id;
   }
   const stripeCustomer = await billingService.getCustomer(customerId);
-  if (stripeCustomer.deleted) {
+  if (!stripeCustomer || stripeCustomer.deleted) {
     return { checkoutSession, stripeCustomer: null };
   }
   return { stripeCustomer, checkoutSession };

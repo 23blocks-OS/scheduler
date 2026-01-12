@@ -479,7 +479,7 @@ export class CreditService {
     } else if (userId) {
       const billingService = getBillingProviderService();
       const teamMonthlyPrice = await billingService.getPrice(process.env.STRIPE_TEAM_MONTHLY_PRICE_ID || "");
-      const pricePerSeat = teamMonthlyPrice.unit_amount ?? 0;
+      const pricePerSeat = teamMonthlyPrice?.unit_amount ?? 0;
       warningLimit = (pricePerSeat / 2) * 0.2;
     }
 

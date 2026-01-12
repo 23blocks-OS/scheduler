@@ -1,5 +1,5 @@
 import { getBillingProviderService } from "@calcom/features/ee/billing/di/containers/Billing";
-import type { StripeBillingService } from "@calcom/features/ee/billing/service/billingProvider/StripeBillingService";
+import type { IBillingProviderService } from "@calcom/features/ee/billing/service/billingProvider/IBillingProviderService";
 import { UserRepository } from "@calcom/features/users/repositories/UserRepository";
 import {
   ORGANIZATION_SELF_SERVE_PRICE,
@@ -79,7 +79,7 @@ type StripePrice = {
 };
 
 export class OrganizationPaymentService {
-  protected billingService: StripeBillingService;
+  protected billingService: IBillingProviderService;
   protected permissionService: OrganizationPermissionService;
   protected user: OnboardingUser;
 

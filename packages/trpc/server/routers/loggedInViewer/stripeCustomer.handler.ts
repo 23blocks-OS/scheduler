@@ -58,7 +58,7 @@ export const stripeCustomerHandler = async ({ ctx }: StripeCustomerOptions) => {
 
   // Fetch stripe customer
   const customer = await billingService.getCustomer(stripeCustomerId);
-  if (customer.deleted) {
+  if (!customer || customer.deleted) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "No stripe customer found" });
   }
 

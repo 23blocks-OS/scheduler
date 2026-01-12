@@ -1,4 +1,6 @@
-import { type Container, createModule, ModuleLoader } from "@calcom/features/di/di";
+import type Stripe from "stripe";
+
+import { type Container, createModule, ModuleLoader, type ResolveFunction } from "@calcom/features/di/di";
 
 import { NoOpBillingService } from "../../service/billingProvider/NoOpBillingService";
 import { StripeBillingService } from "../../service/billingProvider/StripeBillingService";
@@ -9,12 +11,13 @@ const billingProviderServiceModule = createModule();
 const token = DI_TOKENS.BILLING_PROVIDER_SERVICE;
 
 // Factory that returns StripeBillingService if Stripe is configured, otherwise NoOpBillingService
-billingProviderServiceModule.bind(token).toFactory((stripeClient) => {
+billingProviderServiceModule.bind(token).toFactory((resolve: ResolveFunction) => {
+  const stripeClient = resolve(DI_TOKENS.STRIPE_CLIENT) as Stripe | null;
   if (!stripeClient) {
     return new NoOpBillingService();
   }
   return new StripeBillingService(stripeClient);
-}, [DI_TOKENS.STRIPE_CLIENT]);
+});
 
 export const billingProviderServiceModuleLoader: ModuleLoader = {
   token,

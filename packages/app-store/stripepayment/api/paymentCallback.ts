@@ -39,6 +39,16 @@ async function getHandler(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
+  if (!checkoutSession) {
+    log.error("Could not find checkoutSession");
+    throw new HttpError({
+      statusCode: 404,
+      message: "Checkout session not found. Please contact support@cal.com and mention your premium username",
+      url: req.url,
+      method: req.method,
+    });
+  }
+
   let user;
 
   const customerEmail = stripeCustomer.email;

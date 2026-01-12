@@ -195,7 +195,6 @@ export class BookingLocationService {
       return {
         bookingLocation: "",
         requiresActualLink: false,
-        conferenceCredentialId: null,
       };
     }
 
