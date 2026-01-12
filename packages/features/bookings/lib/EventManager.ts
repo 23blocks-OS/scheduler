@@ -4,7 +4,6 @@ import type { z } from "zod";
 
 import { getCalendar } from "@calcom/app-store/_utils/getCalendar";
 import { FAKE_DAILY_CREDENTIAL } from "@calcom/app-store/dailyvideo/lib/VideoApiAdapter";
-import { appKeysSchema as calVideoKeysSchema } from "@calcom/app-store/dailyvideo/zod";
 import { getLocationFromApp, MeetLocationType, MSTeamsLocationType } from "@calcom/app-store/locations";
 import getApps from "@calcom/app-store/utils";
 import { createEvent, updateEvent, deleteEvent } from "@calcom/features/calendars/lib/CalendarManager";
@@ -285,40 +284,26 @@ export default class EventManager {
     // TODO this method shouldn't be modifying the event object that's passed in
     const evt = processLocation(event);
 
-    // Fallback to cal video if no location is set
+    // Cal Video fallback disabled - users must explicitly set a location
+    // If no location is set, the booking will proceed without video conferencing
     if (!evt.location) {
-      // See if cal video is enabled & has keys
-      const calVideo = await prisma.app.findUnique({
-        where: {
-          slug: "daily-video",
-        },
-        select: {
-          keys: true,
-          enabled: true,
-        },
-      });
-
-      const calVideoKeys = calVideoKeysSchema.safeParse(calVideo?.keys);
-
-      if (calVideo?.enabled && calVideoKeys.success) evt["location"] = "integrations:daily";
-      log.warn("Falling back to cal video as no location is set");
+      log.info("No location set for event - proceeding without video conferencing");
     }
 
     const [mainHostDestinationCalendar] =
       (evt.destinationCalendar as [undefined | NonNullable<typeof evt.destinationCalendar>[number]]) ?? [];
 
-    // Fallback to Cal Video if Google Meet is selected w/o a Google Calendar connection
+    // Cal Video fallback for Google Meet disabled - if Google Meet can't work, proceed without video
     if (evt.location === MeetLocationType && mainHostDestinationCalendar?.integration !== "google_calendar") {
       const [googleCalendarCredential] = this.calendarCredentials.filter(
         (cred) => cred.type === "google_calendar"
       );
-      // Delegation Credential case won't normally have DestinationCalendar set and thus fallback of using Google Calendar credential would be used. Identify that case.
-      // TODO: We could extend this logic to Regular Credentials also. Having a Google Calendar credential would cause fallback to use that credential to create calendar and thus we could have Google Meet link
       if (!isDelegationCredential({ credentialId: googleCalendarCredential?.id })) {
         log.warn(
-          "Falling back to Cal Video integration for Regular Credential as Google Calendar is not set as destination calendar"
+          "Google Meet selected but Google Calendar not set as destination - proceeding without video link"
         );
-        evt["location"] = "integrations:daily";
+        // Clear the Meet location rather than falling back to Cal Video
+        evt["location"] = undefined;
         evt["conferenceCredentialId"] = undefined;
       }
     }

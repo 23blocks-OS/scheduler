@@ -1,5 +1,5 @@
 import { getLocationValueForDB, OrganizerDefaultConferencingAppType } from "@calcom/app-store/locations";
-import { CalVideoLocationType, type LocationObject } from "@calcom/app-store/locations";
+import { type LocationObject } from "@calcom/app-store/locations";
 import { getAppFromSlug } from "@calcom/app-store/utils";
 import { userMetadata as userMetadataSchema } from "@calcom/prisma/zod-utils";
 
@@ -190,10 +190,11 @@ export class BookingLocationService {
     );
 
     if (!firstRealLocation) {
-      // If no real locations are configured, default to Cal Video
+      // If no real locations are configured, proceed without video conferencing
+      // Don't auto-assign Cal Video
       return {
-        bookingLocation: CalVideoLocationType,
-        requiresActualLink: true,
+        bookingLocation: "",
+        requiresActualLink: false,
         conferenceCredentialId: null,
       };
     }

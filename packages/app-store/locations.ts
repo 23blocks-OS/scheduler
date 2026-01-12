@@ -416,8 +416,10 @@ export const getLocationValueForDB = (
     }
   });
 
+  // Don't default to Cal Video - keep empty if no location was set
+  // This allows bookings without video conferencing
   if (bookingLocation.trim().length === 0) {
-    bookingLocation = DailyLocationType;
+    bookingLocation = "";
   }
 
   return { bookingLocation, conferenceCredentialId };
