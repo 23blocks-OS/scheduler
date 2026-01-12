@@ -41,10 +41,12 @@ async function getHandler(req: NextApiRequest, res: NextApiResponse) {
 
   let user;
 
-  if (stripeCustomer?.email) {
+  // Check if customer is not deleted and has email
+  const customerEmail = "deleted" in stripeCustomer && stripeCustomer.deleted ? null : stripeCustomer.email;
+  if (customerEmail) {
     user = await prisma.user.findFirst({
       where: {
-        email: stripeCustomer.email,
+        email: customerEmail,
       },
       select: {
         id: true,
