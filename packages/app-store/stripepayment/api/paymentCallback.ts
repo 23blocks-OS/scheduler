@@ -28,8 +28,8 @@ async function getHandler(req: NextApiRequest, res: NextApiResponse) {
   const log = logger.getSubLogger({ prefix: [`[paymentCallback] checkoutSessionId: ${checkoutSessionId}`] });
   const { stripeCustomer, checkoutSession } = await getCustomerAndCheckoutSession(checkoutSessionId);
 
-  if (!stripeCustomer) {
-    log.error("Could not find stripeCustomer");
+  if (!stripeCustomer || ("deleted" in stripeCustomer && stripeCustomer.deleted)) {
+    log.error("Could not find stripeCustomer or customer was deleted");
     throw new HttpError({
       statusCode: 404,
       message:
@@ -41,8 +41,7 @@ async function getHandler(req: NextApiRequest, res: NextApiResponse) {
 
   let user;
 
-  // Check if customer is not deleted and has email
-  const customerEmail = "deleted" in stripeCustomer && stripeCustomer.deleted ? null : stripeCustomer.email;
+  const customerEmail = stripeCustomer.email;
   if (customerEmail) {
     user = await prisma.user.findFirst({
       where: {
