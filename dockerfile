@@ -113,7 +113,10 @@ FROM node:18 AS runner
 
 
 WORKDIR /calcom
-COPY --from=builder-two /calcom ./ 
+COPY --from=builder-two /calcom ./
+
+# Download AWS RDS CA certificate for SSL connections (needed for Fargate)
+RUN wget -q -O /us-east-2-bundle.pem https://truststore.pki.rds.amazonaws.com/us-east-2/us-east-2-bundle.pem
 ARG NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000
 ENV NEXT_PUBLIC_WEBAPP_URL=$NEXT_PUBLIC_WEBAPP_URL \
     BUILT_NEXT_PUBLIC_WEBAPP_URL=$NEXT_PUBLIC_WEBAPP_URL
